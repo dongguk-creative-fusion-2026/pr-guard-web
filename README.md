@@ -17,8 +17,18 @@ src/
    └─ projects/[id]/
       ├─ page.tsx          # PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
       └─ reviews/[reviewId]/page.tsx
-                           # 리뷰 상세: 판정, 지적 사항, 분석 재료(바뀐 메서드·호출부, git 동시 변경, blame)
+                           # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
+   └─ api/reviews/[id]/events/route.ts
+                           # 백엔드 리뷰 단계 스트림(SSE) 중계
+src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + motion)
+   ├─ PipelineView.tsx     # 실시간 보기 · 다시보기(1×/2×/4×) · 판정 표시
+   ├─ StageNode.tsx        # 단계 노드 (대기/진행/완료/실패/건너뜀, 단계 수치)
+   ├─ StageDetail.tsx      # 노드를 누르면 그 단계의 결과물
+   ├─ ImpactGraph.tsx      # 바뀐 메서드 ↔ 호출부 그래프 (옛 시그니처 호출 강조)
+   └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
 ```
+
+리뷰 상세 화면은 진행 중인 리뷰면 단계가 켜지는 모습을 실시간으로 보여 주고, 끝난 리뷰는 저장된 단계 기록을 다시보기로 재생한다.
 
 백엔드는 Server Component 와 Server Action 에서만 호출한다. 브라우저가 백엔드를 직접 부르지 않으므로 CORS 설정이 필요 없고, 백엔드 주소도 노출되지 않는다.
 

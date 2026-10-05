@@ -10,6 +10,7 @@ import {
   shortSha,
   VERDICT_LABEL,
 } from "@/lib/format";
+import { PipelineView } from "@/components/pipeline/PipelineView";
 import { ReviewMarkdown } from "../../ReviewMarkdown";
 
 export const dynamic = "force-dynamic";
@@ -51,9 +52,12 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         )}
       </p>
 
+      <PipelineView reviewId={review.id} />
+
       {review.status !== "DONE" ? (
         <div className="empty">
           <span className={`badge ${review.status}`}>{review.status}</span>
+          {review.status === "PENDING" && <p className="muted">대기열에서 차례를 기다리는 중입니다.</p>}
           {review.error && <p className="error">{review.error}</p>}
         </div>
       ) : (
