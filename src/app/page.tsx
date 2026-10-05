@@ -16,7 +16,15 @@ export default async function Home() {
 
   return (
     <>
-      <h1>프로젝트 등록</h1>
+      <section className="hero">
+        <h1>사람과 AI가 함께 개발하는 팀의 코드 신뢰성을 지킵니다</h1>
+        <p>
+          바이브코딩으로 만든 그럴듯한 코드가 그대로 머지되지 않도록, PR 이 올라오면 diff · 레포 전체 · git 이력 · PR
+          설명 · 다른 열린 PR 을 함께 분석해 팀의 관례와 변경 이력을 기준으로 근거를 붙여 검증합니다.
+        </p>
+      </section>
+
+      <h2>프로젝트 등록</h2>
       <p className="muted">public GitHub 레포 주소를 등록하면 열린 PR 을 주기적으로 확인해서 리뷰를 남깁니다.</p>
       <RegisterForm />
 

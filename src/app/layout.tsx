@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PR Guard",
-  description: "AI 생성 코드 PR 리뷰 플랫폼",
+  description: "사람과 AI가 함께 개발하는 팀의 코드 신뢰성을 확보하는 PR 검증 플랫폼",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
