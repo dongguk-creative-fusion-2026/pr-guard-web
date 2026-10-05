@@ -219,3 +219,67 @@ details.review > summary::-webkit-details-marker {
   border: 1px dashed var(--border);
   border-radius: 6px;
 }
+
+h3 {
+  font-size: 1rem;
+  margin: 24px 0 8px;
+}
+
+button.small {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.verdict {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.verdict.large {
+  font-size: 1rem;
+  padding: 4px 14px;
+}
+
+.verdict.MERGEABLE {
+  background: var(--ok);
+}
+
+.verdict.NEEDS_CHANGES {
+  background: var(--warn);
+}
+
+.verdict.NOT_RECOMMENDED {
+  background: var(--danger);
+}
+
+.verdict-box {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+}
+
+.sev {
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sev.BLOCKER {
+  color: var(--danger);
+}
+
+.sev.MAJOR {
+  color: var(--warn);
+}
+
+.sev.MINOR,
+.sev.INFO {
+  color: var(--muted);
+}

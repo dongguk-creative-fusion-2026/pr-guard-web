@@ -31,6 +31,16 @@ export async function pollNow(projectId: number): Promise<FormState> {
   }
 }
 
+export async function rerunReview(projectId: number, prNumber: number): Promise<FormState> {
+  try {
+    const r = await api.rerun(projectId, prNumber);
+    revalidatePath(`/projects/${projectId}`);
+    return { message: `PR #${prNumber} 다시 리뷰 대기 (run ${r.run})` };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "다시 리뷰 요청에 실패했습니다" };
+  }
+}
+
 export async function deleteProject(projectId: number) {
   await api.deleteProject(projectId);
   revalidatePath("/");

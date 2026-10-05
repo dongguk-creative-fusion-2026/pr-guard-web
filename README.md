@@ -13,8 +13,11 @@ src/
 └─ app/
    ├─ page.tsx             # 레포 등록 + 프로젝트 목록
    ├─ RegisterForm.tsx
-   ├─ actions.ts           # Server Actions: 등록, 지금 확인, 삭제
-   └─ projects/[id]/       # PR 목록, 리뷰 기록
+   ├─ actions.ts           # Server Actions: 등록, 지금 확인, 다시 리뷰, 삭제
+   └─ projects/[id]/
+      ├─ page.tsx          # PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
+      └─ reviews/[reviewId]/page.tsx
+                           # 리뷰 상세: 판정, 지적 사항, 분석 재료(바뀐 메서드·호출부, git 동시 변경, blame)
 ```
 
 백엔드는 Server Component 와 Server Action 에서만 호출한다. 브라우저가 백엔드를 직접 부르지 않으므로 CORS 설정이 필요 없고, 백엔드 주소도 노출되지 않는다.
