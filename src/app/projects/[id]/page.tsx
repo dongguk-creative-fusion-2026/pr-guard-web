@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
-import { formatTime, shortSha } from "@/lib/format";
+import { api, ApiError, type Review } from "@/lib/api";
+import { formatTime, shortSha, VERDICT_LABEL } from "@/lib/format";
 import { ProjectActions } from "./ProjectActions";
-import { ReviewMarkdown } from "./ReviewMarkdown";
+import { RerunButton } from "./RerunButton";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +13,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   let data;
   try {
-    data = await Promise.all([api.getProject(id), api.listPulls(id), api.listReviews(id)]);
+    data = await Promise.all([api.getProject(id), api.listPulls(id), api.listReviews(id, 50)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
   const [project, pulls, reviews] = data;
+  const latestByPr = new Map<number, Review>();
+  for (const r of reviews) {
+    if (!latestByPr.has(r.prNumber)) latestByPr.set(r.prNumber, r);
+  }
 
   return (
     <>
@@ -43,42 +48,36 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               <tr>
                 <th>PR</th>
                 <th>제목</th>
-                <th>작성자</th>
                 <th>커밋</th>
-                <th>상태</th>
                 <th>최근 리뷰</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {pulls.map((pr) => (
-                <tr key={pr.id}>
-                  <td>
-                    <a href={pr.htmlUrl} target="_blank" rel="noreferrer">
-                      #{pr.number}
-                    </a>
-                  </td>
-                  <td>
-                    {pr.title}
-                    <div className="muted">
-                      <code>{pr.headRef}</code> → <code>{pr.baseRef}</code>
-                    </div>
-                  </td>
-                  <td>{pr.author}</td>
-                  <td>
-                    <code>{shortSha(pr.headSha)}</code>
-                  </td>
-                  <td>
-                    <span className={`badge ${pr.state}`}>{pr.state}</span>
-                  </td>
-                  <td>
-                    {pr.latestReviewStatus ? (
-                      <span className={`badge ${pr.latestReviewStatus}`}>{pr.latestReviewStatus}</span>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {pulls.map((pr) => {
+                const latest = latestByPr.get(pr.number);
+                return (
+                  <tr key={pr.id}>
+                    <td>
+                      <a href={pr.htmlUrl} target="_blank" rel="noreferrer">
+                        #{pr.number}
+                      </a>
+                      {pr.state === "closed" && <div className="badge closed">closed</div>}
+                    </td>
+                    <td>
+                      {pr.title}
+                      <div className="muted">
+                        {pr.author} · <code>{pr.headRef}</code> → <code>{pr.baseRef}</code>
+                      </div>
+                    </td>
+                    <td>
+                      <code>{shortSha(pr.headSha)}</code>
+                    </td>
+                    <td>{latest ? <ReviewBadge review={latest} projectId={project.id} /> : "-"}</td>
+                    <td>{pr.state === "open" && <RerunButton projectId={project.id} prNumber={pr.number} />}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -88,34 +87,50 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       {reviews.length === 0 ? (
         <div className="empty">아직 리뷰가 없습니다</div>
       ) : (
-        reviews.map((r) => (
-          <details key={r.id} className="review">
-            <summary className="row">
-              <span className={`badge ${r.status}`}>{r.status}</span>
-              <span>
-                PR #{r.prNumber} · <code>{shortSha(r.headSha)}</code>
-              </span>
-              <span className="muted">
-                {formatTime(r.finishedAt ?? r.createdAt)}
-                {r.reviewer && ` · ${r.reviewer}`}
-              </span>
-              {r.commentUrl && (
-                <a href={r.commentUrl} target="_blank" rel="noreferrer">
-                  코멘트 보기
-                </a>
-              )}
-            </summary>
-            <div className="review-body">
-              {r.error && <p className="error">{r.error}</p>}
-              {r.result ? (
-                <ReviewMarkdown>{r.result}</ReviewMarkdown>
-              ) : (
-                !r.error && <p className="muted">결과 없음</p>
-              )}
-            </div>
-          </details>
-        ))
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>리뷰</th>
+                <th>PR</th>
+                <th>결과</th>
+                <th>지적</th>
+                <th>리뷰어</th>
+                <th>시각</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviews.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <Link href={`/projects/${project.id}/reviews/${r.id}`}>#{r.id}</Link>
+                  </td>
+                  <td>
+                    #{r.prNumber} · <code>{shortSha(r.headSha)}</code>
+                    {r.run > 1 && <span className="muted"> · run {r.run}</span>}
+                  </td>
+                  <td>
+                    <ReviewBadge review={r} />
+                  </td>
+                  <td>{r.status === "DONE" ? `${r.findingCount}건` : "-"}</td>
+                  <td className="muted">{r.reviewer ?? "-"}</td>
+                  <td className="muted">{formatTime(r.finishedAt ?? r.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );
+}
+
+function ReviewBadge({ review, projectId }: { review: Review; projectId?: number }) {
+  const badge =
+    review.status === "DONE" && review.verdict ? (
+      <span className={`verdict ${review.verdict}`}>{VERDICT_LABEL[review.verdict]}</span>
+    ) : (
+      <span className={`badge ${review.status}`}>{review.status}</span>
+    );
+  return projectId ? <Link href={`/projects/${projectId}/reviews/${review.id}`}>{badge}</Link> : badge;
 }

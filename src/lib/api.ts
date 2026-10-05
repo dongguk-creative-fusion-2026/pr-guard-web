@@ -34,20 +34,96 @@ export type PullRequest = {
 };
 
 export type ReviewStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "SUPERSEDED";
+export type Verdict = "MERGEABLE" | "NEEDS_CHANGES" | "NOT_RECOMMENDED";
+export type Severity = "BLOCKER" | "MAJOR" | "MINOR" | "INFO";
+export type Category = "INTENT" | "IMPACT" | "SECURITY" | "RISK" | "GENERAL";
 
 export type Review = {
   id: number;
   projectId: number;
   prNumber: number;
   headSha: string;
+  /** 같은 커밋을 다시 리뷰한 차수 (폴링이 만든 것은 1) */
+  run: number;
   status: ReviewStatus;
+  verdict: Verdict | null;
   reviewer: string | null;
+  summary: string | null;
+  /** PR 에 남긴 요약 코멘트 원문 (마크다운) */
   result: string | null;
   error: string | null;
   commentUrl: string | null;
+  findingCount: number;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+};
+
+export type Finding = {
+  id: number;
+  ruleId: string;
+  category: Category;
+  severity: Severity;
+  file: string | null;
+  line: number | null;
+  title: string;
+  message: string;
+  evidence: string | null;
+  fingerprint: string;
+  source: "TOOL" | "LLM";
+};
+
+export type CallerView = { callerId: string; file: string; line: number };
+
+export type ChangedMethodView = {
+  kind: "ADDED" | "REMOVED" | "MODIFIED";
+  id: string | null;
+  baseId: string | null;
+  file: string;
+  line: number;
+  signatureChanged: boolean;
+  bodyChanged: boolean;
+  annotationsChanged: boolean;
+  test: boolean;
+  callers: CallerView[];
+  staleCalls: CallerView[];
+};
+
+export type IndexStats = {
+  files: number;
+  types: number;
+  methods: number;
+  calls: number;
+  unresolvedCalls: number;
+  failedFiles: number;
+};
+
+export type CoChange = {
+  file: string;
+  partner: string;
+  directory: boolean;
+  support: number;
+  fileCommits: number;
+  confidence: number;
+};
+
+export type AnalysisContext = {
+  baseSha: string | null;
+  headSha: string;
+  baseIndex: IndexStats;
+  headIndex: IndexStats;
+  changedMethods: ChangedMethodView[];
+  history: { file: string; commits: number; coChanges: CoChange[] }[];
+  historyCommits: number;
+  blame: { file: string; line: number; sha: string; author: string; time: number; summary: string }[];
+  notes: string[];
+  elapsedMs: number;
+};
+
+export type ReviewDetail = {
+  review: Review;
+  findings: Finding[];
+  context: AnalysisContext | null;
 };
 
 export type PollResult = {
@@ -97,4 +173,7 @@ export const api = {
   listPulls: (id: number) => call<PullRequest[]>(`/api/projects/${id}/pulls`),
   listReviews: (id: number, limit = 20) => call<Review[]>(`/api/projects/${id}/reviews?limit=${limit}`),
   pollNow: (id: number) => call<PollResult>(`/api/projects/${id}/poll`, { method: "POST" }),
+  getReview: (reviewId: number) => call<ReviewDetail>(`/api/reviews/${reviewId}`),
+  rerun: (id: number, number: number) =>
+    call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };
