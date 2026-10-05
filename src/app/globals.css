@@ -564,18 +564,3 @@ button.small {
 button.small.primary {
   color: #fff;
 }
-
-.hero {
-  padding: 8px 0 8px;
-}
-
-.hero h1 {
-  font-size: 1.6rem;
-  line-height: 1.35;
-  margin-bottom: 8px;
-}
-
-.hero p {
-  color: var(--muted);
-  margin: 0;
-}
