@@ -1,7 +1,8 @@
 import "server-only";
 
 // 백엔드(pr-guard-api) 주소. 브라우저가 아니라 Next 서버에서만 호출하므로 CORS 설정이 필요 없다.
-const BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
+const BASE = API_BASE;
 
 export type Project = {
   id: number;

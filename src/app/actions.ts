@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 
-export type FormState = { error?: string; message?: string };
+export type FormState = { error?: string; message?: string; reviewId?: number };
 
 export async function registerProject(_: FormState, form: FormData): Promise<FormState> {
   const url = String(form.get("url") ?? "").trim();
@@ -35,7 +35,7 @@ export async function rerunReview(projectId: number, prNumber: number): Promise<
   try {
     const r = await api.rerun(projectId, prNumber);
     revalidatePath(`/projects/${projectId}`);
-    return { message: `PR #${prNumber} 다시 리뷰 대기 (run ${r.run})` };
+    return { message: `PR #${prNumber} 다시 리뷰 대기 (run ${r.run})`, reviewId: r.id };
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "다시 리뷰 요청에 실패했습니다" };
   }

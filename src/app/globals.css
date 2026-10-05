@@ -30,6 +30,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -282,4 +283,284 @@ button.small {
 .sev.MINOR,
 .sev.INFO {
   color: var(--muted);
+}
+
+/* ── 리뷰 파이프라인 시각화 ── */
+/* 본문 폭(960px)보다 넓게 써서 그래프를 덜 축소한다 */
+.pipeline {
+  position: relative;
+  left: 50%;
+  width: min(1680px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  margin: 16px 0 24px;
+}
+
+.pipeline-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.pipeline-bar .spacer {
+  flex: 1;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.live-dot.on {
+  background: var(--danger);
+  animation: live 1s ease-in-out infinite;
+}
+
+@keyframes live {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.pipeline-graph {
+  position: relative;
+  height: 540px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.pipeline-hint {
+  margin: 6px 0 0;
+}
+
+.stage-node {
+  width: 184px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s;
+}
+
+.stage-node.PENDING {
+  opacity: 0.55;
+}
+
+.stage-node.RUNNING {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.stage-node.DONE {
+  border-color: var(--ok);
+}
+
+.stage-node.FAILED {
+  border-color: var(--danger);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.stage-node.SKIPPED {
+  border-style: dashed;
+  opacity: 0.5;
+}
+
+.stage-node.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stage-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.stage-label {
+  flex: 1;
+}
+
+.stage-status {
+  width: 16px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.stage-node.DONE .stage-status {
+  color: var(--ok);
+}
+
+.stage-node.FAILED .stage-status {
+  color: var(--danger);
+}
+
+.stage-message {
+  margin-top: 2px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.stage-metrics span {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.stage-metrics .ms {
+  color: var(--muted);
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.verdict-reveal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+}
+
+.verdict-reveal.MERGEABLE {
+  background: var(--ok);
+}
+
+.verdict-reveal.NEEDS_CHANGES {
+  background: var(--warn);
+}
+
+.verdict-reveal.NOT_RECOMMENDED {
+  background: var(--danger);
+}
+
+.stage-detail {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stat {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.cochange-list {
+  display: grid;
+  gap: 8px;
+}
+
+.cochange-label {
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.finding-list {
+  padding-left: 18px;
+}
+
+.impact-graph {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.impact-node {
+  width: 260px !important;
+  font-size: 11px;
+  text-align: left;
+}
+
+.impact-node.method {
+  border: 1.5px solid var(--accent) !important;
+}
+
+.impact-node.caller.stale {
+  border: 1.5px solid var(--danger) !important;
+}
+
+.impact-kind {
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.impact-kind.sig,
+.impact-kind.REMOVED {
+  color: var(--danger);
+}
+
+.badge.SKIPPED,
+.badge.PENDING {
+  color: var(--muted);
+}
+
+button.small.primary {
+  color: #fff;
 }
