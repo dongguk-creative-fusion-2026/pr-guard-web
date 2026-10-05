@@ -78,6 +78,26 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   PUBLISH: { x: 7 * COL, y: 2 * ROW },
 };
 
+const VCOL = 210;
+const VROW = 104;
+
+/** 좁은 화면용 세로 배치: 위에서 아래로 흐르고, 병렬 단계는 두 줄로 나눈다. */
+export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number; y: number }> = {
+  COLLECT: { x: 0, y: 0 },
+  CHECKOUT: { x: 0, y: VROW },
+  INDEX_BASE: { x: -VCOL / 2, y: 2 * VROW },
+  INDEX_HEAD: { x: VCOL / 2, y: 2 * VROW },
+  METHOD_DIFF: { x: 0, y: 3 * VROW },
+  HISTORY: { x: 0, y: 4 * VROW },
+  CHECK_A: { x: -VCOL, y: 5 * VROW },
+  CHECK_B: { x: 0, y: 5 * VROW },
+  CHECK_C: { x: VCOL, y: 5 * VROW },
+  CHECK_D: { x: -VCOL / 2, y: 6 * VROW },
+  LLM: { x: VCOL / 2, y: 6 * VROW },
+  VERDICT: { x: 0, y: 7 * VROW },
+  PUBLISH: { x: 0, y: 8 * VROW },
+};
+
 export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] = [
   ["COLLECT", "CHECKOUT"],
   ["CHECKOUT", "INDEX_BASE"],

@@ -1,16 +1,26 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { Background, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
+import { Background, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow, type Edge } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StageDetail } from "./StageDetail";
 import { StageNode, type StageFlowNode } from "./StageNode";
-import { EDGES, GRAPH_STAGES, POSITIONS, reduceStates, type ReviewEvent, type StageId } from "./stages";
+import {
+  EDGES,
+  GRAPH_STAGES,
+  POSITIONS,
+  POSITIONS_VERTICAL,
+  reduceStates,
+  type ReviewEvent,
+  type StageId,
+} from "./stages";
 import { usePipelineEvents } from "./usePipelineEvents";
 
 const nodeTypes = { stage: StageNode };
+/** 이보다 좁으면 세로 배치 */
+const VERTICAL_BELOW = 900;
 const SPEEDS = [1, 2, 4] as const;
 const VERDICT_LABEL: Record<string, string> = {
   MERGEABLE: "머지 가능",
@@ -22,12 +32,47 @@ const VERDICT_LABEL: Record<string, string> = {
  * 리뷰 파이프라인 그래프. 진행 중이면 실시간으로, 끝난 리뷰는 다시보기로 단계가 켜지는 모습을 보여 준다.
  */
 export function PipelineView({ reviewId }: { reviewId: number }) {
+  return (
+    <ReactFlowProvider>
+      <Pipeline reviewId={reviewId} />
+    </ReactFlowProvider>
+  );
+}
+
+/** 그래프 영역 크기가 바뀔 때마다 다시 맞춘다 (fitView 는 처음 한 번만 하므로). */
+function useContainerFit(vertical: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(entry.contentRect.width);
+      requestAnimationFrame(() => fitView({ padding: 0.08 }));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitView]);
+  useEffect(() => {
+    requestAnimationFrame(() => fitView({ padding: 0.08 }));
+  }, [vertical, fitView]);
+  return { ref, width };
+}
+
+function Pipeline({ reviewId }: { reviewId: number }) {
   const router = useRouter();
   const { events, ended } = usePipelineEvents(reviewId);
   const [replay, setReplay] = useState<{ cursor: number; speed: number } | null>(null);
   const [selected, setSelected] = useState<Exclude<StageId, "REVIEW"> | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const sawLive = useRef(false);
+  const [vertical, setVertical] = useState(false);
+  const { ref: graphRef, width } = useContainerFit(vertical);
+
+  useEffect(() => {
+    if (width > 0) setVertical(width < VERTICAL_BELOW);
+  }, [width]);
 
   // 진행 중인 리뷰를 보다가 끝나면 아래 지적 사항 영역을 새로 불러온다
   useEffect(() => {
@@ -68,8 +113,8 @@ export function PipelineView({ reviewId }: { reviewId: number }) {
   const nodes: StageFlowNode[] = GRAPH_STAGES.map((stage) => ({
     id: stage,
     type: "stage",
-    position: POSITIONS[stage],
-    data: { stage, state: states[stage], selected: focus === stage },
+    position: (vertical ? POSITIONS_VERTICAL : POSITIONS)[stage],
+    data: { stage, state: states[stage], selected: focus === stage, vertical },
     draggable: false,
   }));
 
@@ -142,7 +187,12 @@ export function PipelineView({ reviewId }: { reviewId: number }) {
         )}
       </div>
 
-      <div className="pipeline-graph">
+      <div
+        ref={graphRef}
+        className="pipeline-graph"
+        // 세로 배치는 폭에 맞춰 줄어드는 만큼 높이도 줄인다
+        style={vertical && width > 0 ? { height: Math.min(900, Math.round(width * 1.35)) } : undefined}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}

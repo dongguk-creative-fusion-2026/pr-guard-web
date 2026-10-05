@@ -8,6 +8,8 @@ export type StageNodeData = {
   stage: Exclude<StageId, "REVIEW">;
   state: StageState;
   selected: boolean;
+  /** 세로 배치면 위→아래로 연결한다 */
+  vertical: boolean;
 };
 
 export type StageFlowNode = Node<StageNodeData, "stage">;
@@ -21,7 +23,7 @@ const STATUS_ICON: Record<StageState["status"], string> = {
 };
 
 export function StageNode({ data }: NodeProps<StageFlowNode>) {
-  const { stage, state, selected } = data;
+  const { stage, state, selected, vertical } = data;
   const meta = STAGE_META[stage];
   const metrics = stageMetrics(stage, state.data);
   const ms = durationMs(state);
@@ -36,7 +38,7 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
           : { scale: 1 }
       }
     >
-      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} isConnectable={false} />
       <div className="stage-head">
         <span className="stage-icon">{meta.icon}</span>
         <span className="stage-label">{meta.label}</span>
@@ -68,7 +70,7 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
           {ms != null && <span className="ms">{ms}ms</span>}
         </motion.div>
       )}
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} isConnectable={false} />
     </motion.div>
   );
 }
