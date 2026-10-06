@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, ApiError, type Review } from "@/lib/api";
 import { formatTime, shortSha, VERDICT_LABEL } from "@/lib/format";
+import { GraphSection } from "./GraphSection";
 import { ProjectActions } from "./ProjectActions";
 import { RerunButton } from "./RerunButton";
 
@@ -13,12 +14,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   let data;
   try {
-    data = await Promise.all([api.getProject(id), api.listPulls(id), api.listReviews(id, 50)]);
+    data = await Promise.all([api.getProject(id), api.listPulls(id), api.listReviews(id, 50), api.getGraph(id)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const [project, pulls, reviews] = data;
+  const [project, pulls, reviews, graph] = data;
   const latestByPr = new Map<number, Review>();
   for (const r of reviews) {
     if (!latestByPr.has(r.prNumber)) latestByPr.set(r.prNumber, r);
@@ -37,6 +38,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </p>
       {project.lastPollError && <p className="error">폴링 오류: {project.lastPollError}</p>}
       <ProjectActions projectId={project.id} />
+
+      <h2>의존성 그래프</h2>
+      <GraphSection projectId={project.id} graph={graph} />
 
       <h2>Pull Request</h2>
       {pulls.length === 0 ? (

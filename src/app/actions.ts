@@ -41,6 +41,16 @@ export async function rerunReview(projectId: number, prNumber: number): Promise<
   }
 }
 
+export async function rebuildGraph(projectId: number): Promise<FormState> {
+  try {
+    await api.rebuildGraph(projectId);
+    revalidatePath(`/projects/${projectId}`);
+    return { message: "그래프 다시 만드는 중" };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "그래프 요청에 실패했습니다" };
+  }
+}
+
 export async function deleteProject(projectId: number) {
   await api.deleteProject(projectId);
   revalidatePath("/");

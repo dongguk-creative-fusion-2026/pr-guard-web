@@ -564,3 +564,108 @@ button.small {
 button.small.primary {
   color: #fff;
 }
+
+/* 레포 의존성 그래프 */
+.graph-section > .row {
+  margin-bottom: 8px;
+}
+
+.graph-error {
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  font-size: 0.75rem;
+  color: var(--danger);
+  background: var(--surface);
+  border-radius: 6px;
+  white-space: pre-wrap;
+}
+
+.graph-stats {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dependency-graph {
+  height: 560px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-node {
+  padding: 3px 8px;
+  border: 1.5px solid var(--c);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 14%, var(--bg));
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.file-node.dim {
+  opacity: 0.2;
+}
+
+.file-node.selected {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 45%, transparent);
+  font-weight: 700;
+}
+
+.center-handle {
+  top: 50% !important;
+  left: 50% !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.graph-detail h4 {
+  margin: 8px 0 4px;
+  font-size: 0.85rem;
+}
+
+.graph-deps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.dep-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.8rem;
+}
+
+button.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
