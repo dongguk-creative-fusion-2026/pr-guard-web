@@ -39,7 +39,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       {project.lastPollError && <p className="error">폴링 오류: {project.lastPollError}</p>}
       <ProjectActions projectId={project.id} />
 
-      <h2>의존성 그래프</h2>
       <GraphSection projectId={project.id} graph={graph} />
 
       <h2>Pull Request</h2>
