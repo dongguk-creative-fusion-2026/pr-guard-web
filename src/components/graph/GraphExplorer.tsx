@@ -800,7 +800,7 @@ function ImpactPanel({
           <ul>
             {shown.map((f) => (
               <li key={f.id}>
-                <button onClick={() => onPickFn(f.id)} title={f.file}>
+                <button onClick={() => (f.placeholder ? onPickFile(f.file) : onPickFn(f.id))} title={f.file}>
                   {f.name}
                 </button>
                 {!f.placeholder && <span className="gx-dim">{fileName(f.file)}</span>}
