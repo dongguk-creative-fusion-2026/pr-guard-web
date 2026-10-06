@@ -16,7 +16,8 @@ src/
    ├─ actions.ts           # Server Actions: 등록, 지금 확인, 다시 리뷰, 그래프 다시 만들기, 삭제
    └─ projects/[id]/
       ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
-      ├─ GraphSection.tsx  # 그래프 상태 · 다시 만들기. 만드는 중이면 끝날 때까지 새로고침
+      ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
+      ├─ graph/page.tsx    # 의존성 그래프 전체 화면 (?file= 로 파일 선택)
       └─ reviews/[reviewId]/page.tsx
                            # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
    └─ api/reviews/[id]/events/route.ts
@@ -28,10 +29,11 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    ├─ ImpactGraph.tsx      # 바뀐 메서드 ↔ 호출부 그래프 (옛 시그니처 호출 강조)
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
 src/components/graph/
-   └─ DependencyGraph.tsx  # 레포 전체 파일 의존성 그래프 (GitNexus 결과, d3-force 배치, 누르면 의존 파일 강조)
+   ├─ GraphExplorer.tsx    # 의존성 그래프 탐색 (sigma.js WebGL · 검색 · 묶음 숨기기 · 파일 선택 시 의존 목록)
+   └─ graphModel.ts        # 묶음·색, graphology 그래프 + ForceAtlas2 배치
 ```
 
-프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 프로젝트 화면에서 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.
+프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 프로젝트 화면에는 카드만 두고, "그래프 열기"를 누르면 전체 화면에서 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.
 
 리뷰 상세 화면은 진행 중인 리뷰면 단계가 켜지는 모습을 실시간으로 보여 주고, 끝난 리뷰는 저장된 단계 기록을 다시보기로 재생한다.
 
