@@ -14,6 +14,32 @@ export type Project = {
   lastPolledAt: string | null;
   lastPollError: string | null;
   createdAt: string;
+  /** false 면 리뷰만 하고 PR 에 코멘트를 달지 않는다 */
+  commentEnabled: boolean;
+  /** MAJOR 가 이 개수 이상이면 "수정 후 머지". null 이면 서버 기본값(1) */
+  majorThreshold: number | null;
+  /** 등록 화면(온보딩)을 끝낸 시각. null 이면 아직 */
+  onboardedAt: string | null;
+};
+
+/** GitHub 레포 정보 (등록 화면) */
+export type RepoInfo = {
+  description: string | null;
+  language: string | null;
+  stars: number;
+  sizeKb: number;
+  pushedAt: string | null;
+  defaultBranch: string;
+  /** 언어별 코드 크기 (바이트) */
+  languages: Record<string, number>;
+};
+
+/** 그래프 만들기 진행 단계: dispatched → started → cloned → indexing → indexed */
+export type GraphProgress = {
+  stage: string;
+  message: string | null;
+  data: Record<string, unknown>;
+  at: string;
 };
 
 export type PullRequest = {
@@ -173,6 +199,9 @@ export type RepoGraph = {
   /** 처음 만들기 전에는 null. 다시 만드는 중이거나 실패해도 예전 그래프는 남는다 */
   graph: GraphData | null;
   error: string | null;
+  progress: GraphProgress[];
+  /** 그래프를 만든 GitHub Actions 실행 */
+  runUrl: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -233,6 +262,13 @@ export const api = {
       throw e;
     }),
   rebuildGraph: (id: number) => call<RepoGraph>(`/api/projects/${id}/graph`, { method: "POST" }),
+  getRepoInfo: (id: number) => call<RepoInfo>(`/api/projects/${id}/repo`),
+  updateSettings: (id: number, commentEnabled: boolean, majorThreshold: number | null) =>
+    call<Project>(`/api/projects/${id}/settings`, {
+      method: "PATCH",
+      body: JSON.stringify({ commentEnabled, majorThreshold }),
+    }),
+  finishOnboarding: (id: number) => call<Project>(`/api/projects/${id}/onboarded`, { method: "POST" }),
   rerun: (id: number, number: number) =>
     call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };
