@@ -21,6 +21,7 @@ const BG = "#0a0a12";
 const DIM_NODE = "#1f2030";
 const DIM_EDGE = "#14141f";
 const SEARCH_LIMIT = 8;
+const SMALL_GRAPH = 60;
 
 type Props = {
   data: GraphData;
@@ -96,8 +97,9 @@ export function GraphExplorer({ data, title, subtitle, backHref, fontFamily, ini
       labelSize: 11,
       labelWeight: "500",
       labelColor: { color: "#c8c8d8" },
-      labelRenderedSizeThreshold: 10,
-      labelDensity: 0.35,
+      // 파일이 적으면 이름을 다 보이고, 많으면 큰 노드 위주로만 (겹치지 않게)
+      labelRenderedSizeThreshold: graph.order <= SMALL_GRAPH ? 0 : 10,
+      labelDensity: graph.order <= SMALL_GRAPH ? 1 : 0.35,
       labelGridCellSize: 100,
       defaultDrawNodeHover: hoverRenderer(fontFamily),
       minCameraRatio: 0.05,
