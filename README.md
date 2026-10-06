@@ -17,7 +17,8 @@ src/
    └─ projects/[id]/
       ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
       ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
-      ├─ graph/page.tsx    # 의존성 그래프 전체 화면 (?file= 로 파일 선택)
+      ├─ graph/page.tsx    # 코드 그래프 전체 화면 (?file= · ?fn= 로 선택)
+      ├─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5)
       └─ reviews/[reviewId]/page.tsx  (+ impact/page.tsx: PR 영향 그래프 전체 화면)
                            # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
    └─ api/reviews/[id]/events/route.ts
@@ -31,6 +32,7 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
 src/components/graph/
    ├─ GraphExplorer.tsx    # 코드 그래프 탐색 (sigma.js WebGL): 점 = 함수, 상자 = 파일. 검색 · 묶음 숨기기 · 함수/파일 선택
    ├─ graphModel.ts        # 묶음·색, 파일 배치(ForceAtlas2 + 상자 겹침 풀기), 상자 안 함수 배치
+   ├─ briefing.ts          # 레포 브리핑: 기능 묶음 · 핵심 파일 · 많이 호출되는 함수 · 시작점 · 레이어 · 테스트
    └─ impact.ts            # PR 영향 범위: 바뀐 함수 → 호출하는 함수(직접) → 그 함수를 호출하는 함수(간접)
 ```
 

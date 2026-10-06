@@ -37,6 +37,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         {formatTime(project.lastPolledAt)}
       </p>
       {project.lastPollError && <p className="error">폴링 오류: {project.lastPollError}</p>}
+      {!project.onboardedAt && (
+        <Link href={`/projects/${project.id}/onboarding`} className="ob-banner">
+          <span>
+            <b>시작 안내를 마치지 않았어요</b> 레포 브리핑과 리뷰 설정을 확인하세요
+          </span>
+          <span>이어하기 →</span>
+        </Link>
+      )}
+      <p className="muted settings-line">
+        PR 코멘트 {project.commentEnabled ? "켜짐" : "꺼짐"} · MAJOR {project.majorThreshold ?? 1}건부터 수정 후 머지 ·{" "}
+        <Link href={`/projects/${project.id}/onboarding?step=4`}>설정</Link> ·{" "}
+        <Link href={`/projects/${project.id}/onboarding?step=3`}>레포 브리핑</Link>
+      </p>
       <ProjectActions projectId={project.id} />
 
       <GraphSection projectId={project.id} graph={graph} />

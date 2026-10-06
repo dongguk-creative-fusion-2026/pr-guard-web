@@ -16,7 +16,24 @@ export async function registerProject(_: FormState, form: FormData): Promise<For
     return { error: e instanceof ApiError ? e.message : "등록에 실패했습니다" };
   }
   revalidatePath("/");
-  redirect(`/projects/${id}`);
+  // 등록하면 바로 온보딩(레포 확인 → 분석 → 브리핑 → 설정 → 첫 리뷰)으로 간다
+  redirect(`/projects/${id}/onboarding`);
+}
+
+export async function saveSettings(projectId: number, commentEnabled: boolean, majorThreshold: number | null): Promise<FormState> {
+  try {
+    await api.updateSettings(projectId, commentEnabled, majorThreshold);
+    revalidatePath(`/projects/${projectId}`);
+    return { message: "저장했습니다" };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "설정 저장에 실패했습니다" };
+  }
+}
+
+export async function finishOnboarding(projectId: number) {
+  await api.finishOnboarding(projectId);
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
 }
 
 export async function pollNow(projectId: number): Promise<FormState> {
