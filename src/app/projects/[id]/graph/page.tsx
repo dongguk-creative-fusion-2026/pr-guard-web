@@ -15,10 +15,10 @@ export default async function GraphPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ file?: string }>;
+  searchParams: Promise<{ file?: string; fn?: string }>;
 }) {
   const id = Number((await params).id);
-  const { file } = await searchParams;
+  const { file, fn } = await searchParams;
   if (!Number.isInteger(id)) notFound();
 
   let data;
@@ -54,6 +54,7 @@ export default async function GraphPage({
       backHref={`/projects/${id}`}
       fontFamily={mono.style.fontFamily}
       initialFile={file}
+      initialFunction={fn}
     />
   );
 }

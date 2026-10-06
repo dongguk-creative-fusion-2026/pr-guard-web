@@ -112,26 +112,27 @@ function ImpactCard({ impact, href }: { impact: Impact; href: string }) {
       <div className="graph-card-main">
         <div>
           <div className="graph-card-title">영향 그래프</div>
-          <div className="graph-card-status">바뀐 파일에서 그 파일을 쓰는 파일로 영향이 퍼지는 범위</div>
+          <div className="graph-card-status">바뀐 함수에서 그 함수를 호출하는 함수로 영향이 퍼지는 범위</div>
         </div>
         <div className="graph-card-stats">
           <span>
-            <b className="impact-0">{impact.changed.length + impact.outside.length}</b> 바뀜
+            <b className="impact-0">{impact.changed.length}</b> 바뀐 함수
           </span>
           <span>
-            <b className="impact-1">{impact.direct.length}</b> 직접
+            <b className="impact-1">{impact.direct.length}</b> 직접 영향
           </span>
           <span>
-            <b className="impact-2">{impact.indirect.length}</b> 간접
+            <b className="impact-2">{impact.indirect.length}</b> 간접 영향
           </span>
         </div>
       </div>
       {top.length > 0 && (
         <div className="graph-card-groups">
           {top.map((f) => (
-            <span key={f.path} title={f.reason ?? f.path}>
+            <span key={f.id} title={f.reason ?? f.file}>
               <i className={`impact-dot-${f.level}`} />
-              {fileName(f.path)}
+              {f.name}
+              {!f.placeholder && <small className="impact-file">{fileName(f.file)}</small>}
               {f.stale && <em className="impact-stale">옛 시그니처 호출</em>}
             </span>
           ))}

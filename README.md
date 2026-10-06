@@ -29,9 +29,9 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    ├─ ImpactGraph.tsx      # 바뀐 메서드 ↔ 호출부 그래프 (옛 시그니처 호출 강조)
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
 src/components/graph/
-   ├─ GraphExplorer.tsx    # 의존성 그래프 탐색 (sigma.js WebGL · 검색 · 묶음 숨기기 · 파일 선택 시 의존 목록)
-   ├─ graphModel.ts        # 묶음·색, graphology 그래프 + ForceAtlas2 배치
-   └─ impact.ts            # PR 영향 범위: 바뀐 파일 → 쓰는 파일(직접) → 그 파일을 쓰는 파일(간접)
+   ├─ GraphExplorer.tsx    # 코드 그래프 탐색 (sigma.js WebGL): 점 = 함수, 상자 = 파일. 검색 · 묶음 숨기기 · 함수/파일 선택
+   ├─ graphModel.ts        # 묶음·색, 파일 배치(ForceAtlas2 + 상자 겹침 풀기), 상자 안 함수 배치
+   └─ impact.ts            # PR 영향 범위: 바뀐 함수 → 호출하는 함수(직접) → 그 함수를 호출하는 함수(간접)
 ```
 
 프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 프로젝트 화면에는 카드만 두고, "그래프 열기"를 누르면 전체 화면에서 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.

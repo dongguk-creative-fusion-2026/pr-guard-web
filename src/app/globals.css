@@ -1239,3 +1239,101 @@ button.small.primary {
 .gx-findings li {
   padding: 3px 0;
 }
+
+/* 함수 단위 그래프: 파일 상자 캔버스 위에 sigma 를 겹친다 */
+.gx-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 22px 22px;
+}
+
+.gx-stage .gx-boxes,
+.gx-stage .gx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gx-stage .gx-boxes {
+  pointer-events: none;
+}
+
+.gx-stage .gx-canvas {
+  background: none;
+}
+
+.gx-stats.gx-stats-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.gx-warn {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 12px;
+}
+
+.gx-kind {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.gx-kind.fn {
+  background: rgba(34, 211, 238, 0.15);
+  color: #67e8f9;
+}
+
+.gx-kind.file {
+  background: rgba(129, 140, 248, 0.18);
+  color: #c7d2fe;
+}
+
+.gx button.gx-fn,
+.gx button.gx-link {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+  color: #e4e4ed;
+  cursor: pointer;
+}
+
+.gx button.gx-fn:hover,
+.gx button.gx-link:hover {
+  color: #a5b4fc;
+}
+
+.gx button.gx-link {
+  display: block;
+  margin: 6px 0 2px;
+  font-size: 11px;
+  color: #a5a5bd;
+  overflow-wrap: anywhere;
+}
+
+.gx-level {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.gx-impact-list li > .gx-dim {
+  font-size: 11px;
+}
+
+.impact-file {
+  margin-left: 4px;
+  color: #7a7a90;
+  font-size: 0.7rem;
+}
