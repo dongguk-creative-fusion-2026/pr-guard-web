@@ -157,11 +157,16 @@ export function computeImpact(graph: GraphData, context: AnalysisContext | null,
     const target = matchFunction(functions, m.file, methodName(m.id ?? m.baseId), m.line);
     for (const [list, stale] of [[m.callers, false], [m.staleCalls, true]] as const) {
       for (const c of list) {
-        const f = functionAt(functions, c.file, c.line) ?? functions.find((x) => x.file === c.file && x.placeholder);
+        // 필드 초기화처럼 함수 밖에서 부르는 곳은 파일 단위 항목으로 둔다
+        const outsideFunction = filesInGraph.has(c.file)
+          ? { id: `file:${c.file}`, name: `${fileName(c.file)} (함수 밖)`, kind: "File", file: c.file, line: c.line, endLine: c.line, placeholder: true }
+          : null;
+        const f = functionAt(functions, c.file, c.line) ?? functions.find((x) => x.file === c.file && x.placeholder) ?? outsideFunction;
         if (!f) continue;
         let hit = result.get(f.id);
         if (!hit) {
-          hit = make(f, 1, target ? `호출 → ${label(target)} (분석기)` : "호출부 (분석기)");
+          const where = f.placeholder ? ` · ${c.line}번째 줄` : "";
+          hit = make(f, 1, `${target ? `호출 → ${label(target)}` : "호출부"} (분석기)${where}`);
           result.set(f.id, hit);
         }
         hit.confirmed = true;
