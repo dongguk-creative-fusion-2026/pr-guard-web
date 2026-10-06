@@ -108,11 +108,22 @@ export type CoChange = {
   confidence: number;
 };
 
+/** PR 에서 바뀐 파일. status: added, modified, removed, renamed … */
+export type FileChange = {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  previousPath: string | null;
+};
+
 export type AnalysisContext = {
   baseSha: string | null;
   headSha: string;
   baseIndex: IndexStats;
   headIndex: IndexStats;
+  /** 예전 리뷰에는 없다 (그때는 history 의 파일로 대신한다) */
+  files?: FileChange[];
   changedMethods: ChangedMethodView[];
   history: { file: string; commits: number; coChanges: CoChange[] }[];
   historyCommits: number;

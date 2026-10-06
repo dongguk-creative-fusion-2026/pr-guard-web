@@ -18,7 +18,7 @@ src/
       ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
       ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
       ├─ graph/page.tsx    # 의존성 그래프 전체 화면 (?file= 로 파일 선택)
-      └─ reviews/[reviewId]/page.tsx
+      └─ reviews/[reviewId]/page.tsx  (+ impact/page.tsx: PR 영향 그래프 전체 화면)
                            # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
    └─ api/reviews/[id]/events/route.ts
                            # 백엔드 리뷰 단계 스트림(SSE) 중계
@@ -30,10 +30,13 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
 src/components/graph/
    ├─ GraphExplorer.tsx    # 의존성 그래프 탐색 (sigma.js WebGL · 검색 · 묶음 숨기기 · 파일 선택 시 의존 목록)
-   └─ graphModel.ts        # 묶음·색, graphology 그래프 + ForceAtlas2 배치
+   ├─ graphModel.ts        # 묶음·색, graphology 그래프 + ForceAtlas2 배치
+   └─ impact.ts            # PR 영향 범위: 바뀐 파일 → 쓰는 파일(직접) → 그 파일을 쓰는 파일(간접)
 ```
 
 프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 프로젝트 화면에는 카드만 두고, "그래프 열기"를 누르면 전체 화면에서 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.
+
+리뷰 상세의 "영향 그래프"는 같은 그래프 위에 그 PR 이 바꾼 파일(노랑)에서 그 파일을 쓰는 파일(직접, 빨강), 그 파일을 쓰는 파일(간접, 주황)로 영향이 퍼지는 모습을 보여 준다. 분석기가 확인한 호출부와 옛 시그니처로 부르는 곳, 지적 사항이 있는 파일을 함께 표시한다.
 
 리뷰 상세 화면은 진행 중인 리뷰면 단계가 켜지는 모습을 실시간으로 보여 주고, 끝난 리뷰는 저장된 단계 기록을 다시보기로 재생한다.
 

@@ -10,6 +10,7 @@ import {
   shortSha,
   VERDICT_LABEL,
 } from "@/lib/format";
+import { computeImpact, type Impact } from "@/components/graph/impact";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { ReviewMarkdown } from "../../ReviewMarkdown";
 
@@ -22,8 +23,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   if (!Number.isInteger(projectId) || !Number.isInteger(reviewId)) notFound();
 
   let detail;
+  let graph;
   try {
-    detail = await api.getReview(reviewId);
+    [detail, graph] = await Promise.all([api.getReview(reviewId), api.getGraph(projectId)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
@@ -72,6 +74,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           </div>
           {review.summary && <p>{review.summary}</p>}
 
+          {graph?.graph ? (
+            <ImpactCard
+              impact={computeImpact(graph.graph, context, findings)}
+              href={`/projects/${projectId}/reviews/${reviewId}/impact`}
+            />
+          ) : (
+            <p className="muted">
+              레포 의존성 그래프가 있으면 이 PR 의 영향 범위를 볼 수 있습니다.{" "}
+              <Link href={`/projects/${projectId}`}>프로젝트에서 만들기</Link>
+            </p>
+          )}
+
           <h2>지적 사항</h2>
           {findings.length === 0 ? <div className="empty">지적 사항 없음</div> : <FindingTable findings={findings} />}
 
@@ -85,6 +99,53 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         </>
       )}
     </>
+  );
+}
+
+const IMPACT_PREVIEW = 5;
+
+/** 이 PR 이 레포 그래프에서 닿는 범위 요약. 누르면 전체 화면 영향 그래프 */
+function ImpactCard({ impact, href }: { impact: Impact; href: string }) {
+  const top = [...impact.direct, ...impact.indirect].slice(0, IMPACT_PREVIEW);
+  return (
+    <div className="graph-card impact-card">
+      <div className="graph-card-main">
+        <div>
+          <div className="graph-card-title">영향 그래프</div>
+          <div className="graph-card-status">바뀐 파일에서 그 파일을 쓰는 파일로 영향이 퍼지는 범위</div>
+        </div>
+        <div className="graph-card-stats">
+          <span>
+            <b className="impact-0">{impact.changed.length + impact.outside.length}</b> 바뀜
+          </span>
+          <span>
+            <b className="impact-1">{impact.direct.length}</b> 직접
+          </span>
+          <span>
+            <b className="impact-2">{impact.indirect.length}</b> 간접
+          </span>
+        </div>
+      </div>
+      {top.length > 0 && (
+        <div className="graph-card-groups">
+          {top.map((f) => (
+            <span key={f.path} title={f.reason ?? f.path}>
+              <i className={`impact-dot-${f.level}`} />
+              {fileName(f.path)}
+              {f.stale && <em className="impact-stale">옛 시그니처 호출</em>}
+            </span>
+          ))}
+          {impact.direct.length + impact.indirect.length > IMPACT_PREVIEW && (
+            <span className="graph-card-more">+{impact.direct.length + impact.indirect.length - IMPACT_PREVIEW}</span>
+          )}
+        </div>
+      )}
+      <div className="graph-card-actions">
+        <Link href={href} className="graph-open impact-open">
+          영향 그래프 열기 →
+        </Link>
+      </div>
+    </div>
   );
 }
 
