@@ -15,13 +15,13 @@ export default async function ImpactPage({
   searchParams,
 }: {
   params: Promise<{ id: string; reviewId: string }>;
-  searchParams: Promise<{ file?: string }>;
+  searchParams: Promise<{ file?: string; fn?: string }>;
 }) {
   const p = await params;
   const projectId = Number(p.id);
   const reviewId = Number(p.reviewId);
   if (!Number.isInteger(projectId) || !Number.isInteger(reviewId)) notFound();
-  const { file } = await searchParams;
+  const { file, fn } = await searchParams;
 
   let data;
   try {
@@ -68,6 +68,7 @@ export default async function ImpactPage({
       backHref={backHref}
       fontFamily={mono.style.fontFamily}
       initialFile={file}
+      initialFunction={fn}
       header={header}
     />
   );

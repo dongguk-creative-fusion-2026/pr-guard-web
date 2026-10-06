@@ -20,6 +20,7 @@ type Props = {
   backHref: string;
   fontFamily: string;
   initialFile?: string;
+  initialFunction?: string;
   header: ReactNode;
 };
 

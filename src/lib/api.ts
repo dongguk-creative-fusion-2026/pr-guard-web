@@ -140,13 +140,17 @@ export type ReviewDetail = {
 
 export type GraphStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED";
 
-/** GitNexus 인덱스를 파일 단위로 묶은 의존성 그래프 */
+/** GitNexus 인덱스로 만든 의존성 그래프: 파일 단위 의존 + 그 파일들 안의 함수와 함수 간 호출 */
 export type GraphData = {
   /** id = 레포 안 파일 경로. community = GitNexus 가 찾은 기능 묶음 */
   nodes: { id: string; community: string | null; symbols: number }[];
   /** source 가 target 을 쓴다. types = 관계 종류별 개수 (IMPORTS, CALLS, INJECTS …) */
   edges: { source: string; target: string; weight: number; types: Record<string, number> }[];
   communities: { id: string; label: string; files: number }[];
+  /** 함수 (Method · Function · Constructor). 예전 그래프에는 없다 */
+  functions?: { id: string; name: string; kind: string; file: string; line: number; endLine: number }[];
+  /** source 함수가 target 함수를 호출한다 */
+  calls?: { source: string; target: string; weight: number }[];
   stats: {
     files: number;
     connectedFiles: number;
@@ -154,6 +158,9 @@ export type GraphData = {
     edges: number;
     shownEdges: number;
     truncated: boolean;
+    functions?: number;
+    shownFunctions?: number;
+    shownCalls?: number;
     analyzeMs: number;
   };
 };
