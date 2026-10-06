@@ -127,6 +127,39 @@ export type ReviewDetail = {
   context: AnalysisContext | null;
 };
 
+export type GraphStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED";
+
+/** GitNexus 인덱스를 파일 단위로 묶은 의존성 그래프 */
+export type GraphData = {
+  /** id = 레포 안 파일 경로. community = GitNexus 가 찾은 기능 묶음 */
+  nodes: { id: string; community: string | null; symbols: number }[];
+  /** source 가 target 을 쓴다. types = 관계 종류별 개수 (IMPORTS, CALLS, INJECTS …) */
+  edges: { source: string; target: string; weight: number; types: Record<string, number> }[];
+  communities: { id: string; label: string; files: number }[];
+  stats: {
+    files: number;
+    connectedFiles: number;
+    shownFiles: number;
+    edges: number;
+    shownEdges: number;
+    truncated: boolean;
+    analyzeMs: number;
+  };
+};
+
+export type RepoGraph = {
+  projectId: number;
+  status: GraphStatus;
+  /** 그래프를 만든 기본 브랜치 커밋 */
+  commitSha: string | null;
+  /** 처음 만들기 전에는 null. 다시 만드는 중이거나 실패해도 예전 그래프는 남는다 */
+  graph: GraphData | null;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
 export type PollResult = {
   projectId: number;
   notModified: boolean;
@@ -175,6 +208,13 @@ export const api = {
   listReviews: (id: number, limit = 20) => call<Review[]>(`/api/projects/${id}/reviews?limit=${limit}`),
   pollNow: (id: number) => call<PollResult>(`/api/projects/${id}/poll`, { method: "POST" }),
   getReview: (reviewId: number) => call<ReviewDetail>(`/api/reviews/${reviewId}`),
+  /** 그래프 행이 없으면 null */
+  getGraph: (id: number) =>
+    call<RepoGraph>(`/api/projects/${id}/graph`).catch((e) => {
+      if (e instanceof ApiError && e.code === "GRAPH_NOT_FOUND") return null;
+      throw e;
+    }),
+  rebuildGraph: (id: number) => call<RepoGraph>(`/api/projects/${id}/graph`, { method: "POST" }),
   rerun: (id: number, number: number) =>
     call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };
