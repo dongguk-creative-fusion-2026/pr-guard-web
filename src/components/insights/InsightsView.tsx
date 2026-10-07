@@ -7,7 +7,17 @@ import { formatTime } from "@/lib/format";
 import { cityLegend, CodeCity, type CityColorMode } from "./CodeCity";
 import { CouplingWheel } from "./CouplingWheel";
 import { HotspotMap } from "./HotspotMap";
-import { computeInsights, heatColor, relativeDays, visibleCouplings, type Coupling, type FileMetric, type Insights } from "./metrics";
+import {
+  buildTimeline,
+  computeInsights,
+  heatColor,
+  relativeDays,
+  visibleCouplings,
+  type Coupling,
+  type FileMetric,
+  type Insights,
+  type Timeline,
+} from "./metrics";
 
 export type InsightTab = "city" | "hotspots" | "coupling";
 
@@ -34,17 +44,25 @@ type Props = {
   graphHref: string;
   fontFamily: string;
   initialTab: InsightTab;
+  /** 처음부터 고를 파일 (?file=) */
+  initialFile?: string;
+  /** 처음부터 볼 커밋 시점 (?t=, 0 부터) */
+  initialTime?: number;
 };
 
 /** 코드 인사이트: 코드 시티 · 핫스팟 · 숨은 결합 */
-export function InsightsView({ data, title, subtitle, backHref, graphHref, fontFamily, initialTab }: Props) {
+export function InsightsView({ data, title, subtitle, backHref, graphHref, fontFamily, initialTab, initialFile, initialTime }: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
   const [tab, setTab] = useState<InsightTab>(initialTab);
   const [mode, setMode] = useState<CityColorMode>(insights.hasHistory ? "hotspot" : "group");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialFile && insights.byPath.has(initialFile) ? initialFile : null);
   const [hiddenOnly, setHiddenOnly] = useState(false);
   const [allCouplings, setAllCouplings] = useState(false);
   const couplings = useMemo(() => visibleCouplings(insights, allCouplings), [insights, allCouplings]);
+  const timeline = useMemo(() => buildTimeline(data), [data]);
+  // 시간 여행: null 이면 지금 도시
+  const [timeIndex, setTimeIndex] = useState<number | null>(initialTime ?? null);
+  const time = useMemo(() => (timeline && timeIndex !== null ? timeline.stateAt(timeIndex) : null), [timeline, timeIndex]);
 
   // 탭을 주소에 남긴다 (새로고침 · 공유)
   useEffect(() => {
@@ -74,7 +92,8 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
       <div className="gx-body">
         <div className="ins-stage">
           <div className="ins-hint">{TABS.find((t) => t.key === tab)!.hint}</div>
-          {tab === "city" && <CodeCity insights={insights} mode={mode} selected={selected} onSelect={setSelected} />}
+          {tab === "city" && <CodeCity insights={insights} mode={mode} selected={selected} onSelect={setSelected} time={time} />}
+          {tab === "city" && timeline && <TimeTravel timeline={timeline} index={timeIndex} setIndex={setTimeIndex} insights={insights} />}
           {tab === "hotspots" && <HotspotMap insights={insights} selected={selected} onSelect={setSelected} />}
           {tab === "coupling" && (
             <CouplingWheel insights={insights} selected={selected} onSelect={setSelected} hiddenOnly={hiddenOnly} couplings={couplings} />
@@ -265,6 +284,92 @@ function CouplingList({
   );
 }
 
+const PLAY_FRAME_MS = 60;
+
+/** 코드 시티 아래 시간 여행 막대: 끌거나 재생하면 커밋 순서대로 도시가 지어진다 */
+function TimeTravel({
+  timeline,
+  index,
+  setIndex,
+  insights,
+}: {
+  timeline: Timeline;
+  index: number | null;
+  setIndex: (i: number | null) => void;
+  insights: Insights;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const last = timeline.total - 1;
+  const current = index ?? last;
+  // 전체를 15초쯤에 재생한다
+  const step = Math.max(1, Math.round(timeline.total / (15000 / PLAY_FRAME_MS)));
+
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => {
+      setIndex(Math.min((index ?? -1) + step, last));
+    }, PLAY_FRAME_MS);
+    return () => clearInterval(timer);
+  }, [playing, index, step, last, setIndex]);
+
+  useEffect(() => {
+    if (playing && index !== null && index >= last) setPlaying(false);
+  }, [playing, index, last]);
+
+  const state = timeline.stateAt(current);
+  const date = new Date(state.at).toISOString().slice(0, 10);
+  return (
+    <div className="tt" onClick={(e) => e.stopPropagation()}>
+      <button
+        className="tt-play"
+        onClick={() => {
+          if (!playing && (index === null || index >= last)) setIndex(0);
+          setPlaying(!playing);
+        }}
+        aria-label={playing ? "멈춤" : "재생"}
+      >
+        {playing ? "❚❚" : "▶"}
+      </button>
+      <div className="tt-main">
+        <input
+          type="range"
+          min={0}
+          max={last}
+          value={current}
+          onChange={(e) => {
+            setPlaying(false);
+            setIndex(Number(e.target.value));
+          }}
+        />
+        <div className="tt-info">
+          <b>{date}</b>
+          <span>
+            커밋 {current + 1} / {timeline.total} · {state.author}
+          </span>
+          <span className="tt-files">
+            {state.changed
+              .slice(0, 3)
+              .map((p) => insights.byPath.get(p)?.name ?? p)
+              .join(", ")}
+            {state.changed.length > 3 && ` 외 ${state.changed.length - 3}`}
+          </span>
+        </div>
+      </div>
+      {index !== null && (
+        <button
+          className="tt-now"
+          onClick={() => {
+            setPlaying(false);
+            setIndex(null);
+          }}
+        >
+          지금으로
+        </button>
+      )}
+    </div>
+  );
+}
+
 function FileCard({
   file,
   insights,
@@ -331,6 +436,7 @@ function FileCard({
       <Link className="ins-graph-link" href={`${graphHref}?file=${encodeURIComponent(file.path)}`}>
         코드 그래프에서 보기 →
       </Link>
+      <FunctionCallList file={file} insights={insights} onPick={onPick} />
       <div className="gx-deps">
         <h4 style={{ color: "#f472b6" }}>
           같이 바뀌는 파일 <span className="gx-dim">{partners.length}</span>
@@ -353,5 +459,54 @@ function FileCard({
         )}
       </div>
     </section>
+  );
+}
+
+/** 고른 파일의 함수와 함수별 호출 상대 (코드 시티에서 떠오르는 호의 내용) */
+function FunctionCallList({ file, insights, onPick }: { file: FileMetric; insights: Insights; onPick: (path: string) => void }) {
+  const fns = insights.functionsOf.get(file.path) ?? [];
+  const calls = insights.fileCalls.get(file.path);
+  const label = (id: string) => {
+    const f = insights.fnInfo.get(id);
+    if (!f) return id;
+    return f.file === file.path ? f.name : `${insights.byPath.get(f.file)?.name.replace(/\.[^.]+$/, "") ?? ""}.${f.name}`;
+  };
+  if (fns.length === 0) return null;
+  return (
+    <div className="gx-deps">
+      <h4>
+        함수 호출 <span className="gx-dim">함수 {fns.length}개</span>
+      </h4>
+      <p className="ins-legend-line">
+        <span style={{ color: "#22d3ee" }}>━ 이 파일이 부르는 파일 {calls?.out.size ?? 0}</span> ·{" "}
+        <span style={{ color: "#f472b6" }}>━ 이 파일을 부르는 파일 {calls?.in.size ?? 0}</span>
+      </p>
+      <ul className="ins-fns">
+        {fns.map((f) => (
+          <li key={f.id}>
+            <span className="ins-fn-name">
+              {f.name}
+              <em>:{f.line}</em>
+            </span>
+            {f.out.length > 0 && (
+              <span className="ins-fn-calls out">
+                →{" "}
+                {f.out.slice(0, 4).map((id, i) => {
+                  const target = insights.fnInfo.get(id);
+                  return (
+                    <button key={id} onClick={() => target && onPick(target.file)}>
+                      {i > 0 && ", "}
+                      {label(id)}
+                    </button>
+                  );
+                })}
+                {f.out.length > 4 && ` 외 ${f.out.length - 4}`}
+              </span>
+            )}
+            {f.in.length > 0 && <span className="ins-fn-calls in">← {f.in.length}곳에서 호출</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

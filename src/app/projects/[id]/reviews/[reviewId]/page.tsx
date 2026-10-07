@@ -145,6 +145,9 @@ function ImpactCard({ impact, href }: { impact: Impact; href: string }) {
         <Link href={href} className="graph-open impact-open">
           영향 그래프 열기 →
         </Link>
+        <Link href={href.replace(/\/impact$/, "/city")} className="graph-more">
+          3D 영향 시티
+        </Link>
       </div>
     </div>
   );

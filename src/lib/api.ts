@@ -210,6 +210,10 @@ export type GitHistory = {
   files: Record<string, FileHistory>;
   /** 같이 바뀐 파일 쌍. confidence = 덜 바뀐 파일이 바뀔 때 다른 파일도 같이 바뀐 비율 */
   coChanges: { a: string; b: string; support: number; confidence: number }[];
+  /** 커밋별 변경 (오래된 순). c = [[timelineFiles 번호, 추가, 삭제]], a = authors 번호. 예전 그래프에는 없다 */
+  timeline?: { at: number; a: number; c: [number, number, number][] }[];
+  timelineFiles?: string[];
+  authors?: string[];
 };
 
 export type RepoGraph = {

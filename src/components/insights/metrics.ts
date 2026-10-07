@@ -32,7 +32,15 @@ export type Insights = {
   until: string | null;
   /** 같이 바뀐 파일 쌍. linked = 코드 의존(어느 방향이든)이 있다 */
   couplings: { a: string; b: string; support: number; confidence: number; linked: boolean }[];
+  /** 파일 사이 함수 호출 수: 이 파일 함수가 부르는 파일(out) · 이 파일 함수를 부르는 파일(in) */
+  fileCalls: Map<string, { out: Map<string, number>; in: Map<string, number> }>;
+  /** 파일 안 함수와 그 함수의 호출 상대 (함수 id) */
+  functionsOf: Map<string, FunctionCalls[]>;
+  /** 함수 id → 이름 · 파일 */
+  fnInfo: Map<string, { name: string; file: string }>;
 };
+
+export type FunctionCalls = { id: string; name: string; line: number; out: string[]; in: string[] };
 
 /** 그래프 + git 이력에서 파일별 지표를 만든다 */
 export function computeInsights(data: GraphData): Insights {
@@ -81,6 +89,34 @@ export function computeInsights(data: GraphData): Insights {
     .map(([label, list]) => ({ label, color: colorOf.get(label) ?? UNGROUPED_COLOR, files: list }))
     .sort((a, b) => b.files.length - a.files.length || a.label.localeCompare(b.label));
 
+  const fnInfo = new Map<string, { name: string; file: string }>();
+  const functionsOf = new Map<string, FunctionCalls[]>();
+  const fnCalls = new Map<string, FunctionCalls>();
+  for (const f of codeFunctions(data)) {
+    if (f.placeholder) continue;
+    const name = f.kind === "Constructor" ? `new ${f.name}` : f.name;
+    fnInfo.set(f.id, { name, file: f.file });
+    const entry: FunctionCalls = { id: f.id, name, line: f.line, out: [], in: [] };
+    fnCalls.set(f.id, entry);
+    functionsOf.set(f.file, [...(functionsOf.get(f.file) ?? []), entry]);
+  }
+  for (const list of functionsOf.values()) list.sort((a, b) => a.line - b.line);
+  const fileCalls = new Map<string, { out: Map<string, number>; in: Map<string, number> }>();
+  const fc = (p: string) => {
+    if (!fileCalls.has(p)) fileCalls.set(p, { out: new Map(), in: new Map() });
+    return fileCalls.get(p)!;
+  };
+  for (const c of data.calls ?? []) {
+    const a = fnInfo.get(c.source);
+    const b = fnInfo.get(c.target);
+    if (!a || !b) continue;
+    fnCalls.get(c.source)!.out.push(c.target);
+    fnCalls.get(c.target)!.in.push(c.source);
+    if (a.file === b.file) continue;
+    fc(a.file).out.set(b.file, (fc(a.file).out.get(b.file) ?? 0) + c.weight);
+    fc(b.file).in.set(a.file, (fc(b.file).in.get(a.file) ?? 0) + c.weight);
+  }
+
   const linked = new Set(data.edges.flatMap((e) => [`${e.source}\n${e.target}`, `${e.target}\n${e.source}`]));
   const couplings = (history?.coChanges ?? [])
     .filter((c) => byPath.has(c.a) && byPath.has(c.b))
@@ -95,6 +131,91 @@ export function computeInsights(data: GraphData): Insights {
     since: history?.since ?? null,
     until: history?.until ?? null,
     couplings,
+    fileCalls,
+    functionsOf,
+    fnInfo,
+  };
+}
+
+/** 시간 여행: 어떤 커밋 시점의 파일 상태 */
+export type TimeState = {
+  index: number;
+  total: number;
+  at: number;
+  author: string;
+  changed: string[];
+  /** 파일별: 보이는지, 지금 대비 크기 비율, 방금 바뀌었는지(0~1) */
+  files: Map<string, { visible: boolean; grow: number; flash: number }>;
+};
+
+export type Timeline = {
+  total: number;
+  stateAt: (index: number) => TimeState;
+};
+
+/**
+ * 커밋별 변경으로 시점마다 도시 상태를 계산한다.
+ * 파일 크기는 그 시점까지 쌓인 (추가 - 삭제)를 지금까지의 합으로 나눈 비율로 줄인다.
+ * 처음 기록이 "삭제 없이 추가만"이면 그때 생긴 파일로 보고, 아니면(이력 창보다 오래된 파일) 처음부터 있던 것으로 본다.
+ */
+export function buildTimeline(data: GraphData): Timeline | null {
+  const h = data.history;
+  if (!h?.timeline || !h.timelineFiles || h.timeline.length === 0) return null;
+  const files = h.timelineFiles;
+  const authors = h.authors ?? [];
+  const events = h.timeline;
+  const perFile = files.map(() => ({ idx: [] as number[], cum: [] as number[], born: -1 }));
+  events.forEach((e, i) => {
+    for (const [f, add, del] of e.c) {
+      const p = perFile[f];
+      if (!p) continue;
+      if (p.idx.length === 0) p.born = del === 0 ? i : -1;
+      const prev = p.cum.length ? p.cum[p.cum.length - 1] : 0;
+      p.idx.push(i);
+      p.cum.push(prev + add - del);
+    }
+  });
+  const recent = 3;
+  return {
+    total: events.length,
+    stateAt(index) {
+      const t = Math.min(Math.max(index, 0), events.length - 1);
+      const state = new Map<string, { visible: boolean; grow: number; flash: number }>();
+      files.forEach((path, f) => {
+        const p = perFile[f];
+        if (p.idx.length === 0) {
+          state.set(path, { visible: true, grow: 1, flash: 0 });
+          return;
+        }
+        // t 이하 마지막 변경 위치 (이분 탐색)
+        let lo = 0;
+        let hi = p.idx.length - 1;
+        let k = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (p.idx[mid] <= t) {
+            k = mid;
+            lo = mid + 1;
+          } else hi = mid - 1;
+        }
+        const visible = p.born < 0 || k >= 0;
+        const final = p.cum[p.cum.length - 1];
+        const now = k >= 0 ? p.cum[k] : 0;
+        const base = p.born < 0 ? Math.max(final, 1) * 0.4 : 0;
+        const grow = final + base > 0 ? Math.min(Math.max((now + base) / (final + base), 0.06), 1) : 1;
+        const since = k >= 0 ? t - p.idx[k] : Infinity;
+        state.set(path, { visible, grow, flash: since < recent ? 1 - since / recent : 0 });
+      });
+      const e = events[t];
+      return {
+        index: t,
+        total: events.length,
+        at: e.at * 1000,
+        author: authors[e.a] ?? "",
+        changed: e.c.map(([f]) => files[f]).filter(Boolean),
+        files: state,
+      };
+    },
   };
 }
 
