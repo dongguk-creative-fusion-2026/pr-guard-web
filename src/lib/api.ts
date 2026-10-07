@@ -197,7 +197,7 @@ export type GraphData = {
 
 export type InfraKind =
   | "client" | "dns" | "tunnel" | "proxy" | "app" | "database" | "cache" | "queue"
-  | "storage" | "monitoring" | "external" | "platform" | "ci";
+  | "storage" | "monitoring" | "registry" | "external" | "platform" | "ci";
 
 /** 근거 수준: file = 설정 파일에 적혀 있음, inferred = 이름 · 종류로 추정, missing = 레포에 없음 */
 export type InfraConfidence = "file" | "inferred" | "missing";
