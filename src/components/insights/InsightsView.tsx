@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { GraphData } from "@/lib/api";
+import type { GraphData, InfraMap } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { cityLegend, CodeCity, type CityColorMode } from "./CodeCity";
+import { INFRA_STYLE } from "./InfraLayer";
 import { CouplingWheel } from "./CouplingWheel";
 import { HotspotMap } from "./HotspotMap";
 import {
@@ -48,10 +49,12 @@ type Props = {
   initialFile?: string;
   /** 처음부터 볼 커밋 시점 (?t=, 0 부터) */
   initialTime?: number;
+  /** 근거 파일을 GitHub 에서 열 때 쓰는 주소 (https://github.com/o/r/blob/커밋) */
+  sourceBase?: string | null;
 };
 
 /** 코드 인사이트: 코드 시티 · 핫스팟 · 숨은 결합 */
-export function InsightsView({ data, title, subtitle, backHref, graphHref, fontFamily, initialTab, initialFile, initialTime }: Props) {
+export function InsightsView({ data, title, subtitle, backHref, graphHref, fontFamily, initialTab, initialFile, initialTime, sourceBase }: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
   const [tab, setTab] = useState<InsightTab>(initialTab);
   const [mode, setMode] = useState<CityColorMode>(insights.hasHistory ? "hotspot" : "group");
@@ -63,6 +66,14 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
   // 시간 여행: null 이면 지금 도시
   const [timeIndex, setTimeIndex] = useState<number | null>(initialTime ?? null);
   const time = useMemo(() => (timeline && timeIndex !== null ? timeline.stateAt(timeIndex) : null), [timeline, timeIndex]);
+  // 인프라 층: 사용자 말고도 노드가 있을 때만 의미가 있다
+  const infra = data.infra && data.infra.nodes.length > 1 ? data.infra : null;
+  const [showInfra, setShowInfra] = useState(infra !== null);
+  const [selectedInfra, setSelectedInfra] = useState<string | null>(null);
+  const pickFile = (path: string | null) => {
+    setSelected(path);
+    if (path) setSelectedInfra(null);
+  };
 
   // 탭을 주소에 남긴다 (새로고침 · 공유)
   useEffect(() => {
@@ -92,7 +103,18 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
       <div className="gx-body">
         <div className="ins-stage">
           <div className="ins-hint">{TABS.find((t) => t.key === tab)!.hint}</div>
-          {tab === "city" && <CodeCity insights={insights} mode={mode} selected={selected} onSelect={setSelected} time={time} />}
+          {tab === "city" && (
+            <CodeCity
+              insights={insights}
+              mode={mode}
+              selected={selected}
+              onSelect={pickFile}
+              time={time}
+              infra={showInfra ? infra : null}
+              selectedInfra={selectedInfra}
+              onSelectInfra={setSelectedInfra}
+            />
+          )}
           {tab === "city" && timeline && <TimeTravel timeline={timeline} index={timeIndex} setIndex={setTimeIndex} insights={insights} />}
           {tab === "hotspots" && <HotspotMap insights={insights} selected={selected} onSelect={setSelected} />}
           {tab === "coupling" && (
@@ -132,8 +154,35 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
             </section>
           )}
 
-          {current ? (
-            <FileCard file={current} insights={insights} graphHref={graphHref} onPick={setSelected} onClose={() => setSelected(null)} />
+          {tab === "city" && infra && (
+            <section>
+              <label className="gx-toggle infra-toggle">
+                <input type="checkbox" checked={showInfra} onChange={(e) => setShowInfra(e.target.checked)} />
+                인프라 보기 <span className="gx-dim">요청 경로 · 저장소 · 외부 API</span>
+              </label>
+              {showInfra && <InfraLegend infra={infra} />}
+            </section>
+          )}
+          {tab === "city" && showInfra && infra && selectedInfra ? (
+            <InfraCard
+              infra={infra}
+              id={selectedInfra}
+              insights={insights}
+              sourceBase={sourceBase ?? null}
+              onPickFile={pickFile}
+              onPickNode={setSelectedInfra}
+              onClose={() => setSelectedInfra(null)}
+            />
+          ) : current ? (
+            <FileCard
+              file={current}
+              insights={insights}
+              graphHref={graphHref}
+              onPick={pickFile}
+              onClose={() => setSelected(null)}
+              infra={showInfra ? infra : null}
+              onPickInfra={setSelectedInfra}
+            />
           ) : tab === "coupling" ? (
             <CouplingList
               insights={insights}
@@ -376,13 +425,18 @@ function FileCard({
   graphHref,
   onPick,
   onClose,
+  infra,
+  onPickInfra,
 }: {
   file: FileMetric;
   insights: Insights;
   graphHref: string;
   onPick: (path: string) => void;
   onClose: () => void;
+  infra?: InfraMap | null;
+  onPickInfra?: (id: string) => void;
 }) {
+  const touches = infra ? infra.codeLinks.filter((c) => c.file === file.path) : [];
   const partners = insights.couplings
     .filter((c) => c.a === file.path || c.b === file.path)
     .map((c) => ({ path: c.a === file.path ? c.b : c.a, support: c.support, confidence: c.confidence, linked: c.linked }))
@@ -436,6 +490,29 @@ function FileCard({
       <Link className="ins-graph-link" href={`${graphHref}?file=${encodeURIComponent(file.path)}`}>
         코드 그래프에서 보기 →
       </Link>
+      {touches.length > 0 && infra && (
+        <div className="gx-deps">
+          <h4>이 파일이 닿는 인프라</h4>
+          <ul>
+            {touches.map((c) => {
+              const n = infra.nodes.find((x) => x.id === c.node);
+              if (!n) return null;
+              return (
+                <li key={c.node}>
+                  <button className="infra-pick" onClick={() => onPickInfra?.(n.id)}>
+                    <i style={{ background: INFRA_STYLE[n.kind].color }} />
+                    {n.label}
+                  </button>
+                  <span className="gx-dim">
+                    {CODE_LINK_LABEL[c.kind]}
+                    {c.detail ? ` · ${c.detail}` : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       <FunctionCallList file={file} insights={insights} onPick={onPick} />
       <div className="gx-deps">
         <h4 style={{ color: "#f472b6" }}>
@@ -508,5 +585,140 @@ function FunctionCallList({ file, insights, onPick }: { file: FileMetric; insigh
         ))}
       </ul>
     </div>
+  );
+}
+
+const CODE_LINK_LABEL = { entry: "요청을 받는 진입점", data: "DB 를 쓰는 코드", external: "외부 API 를 부르는 코드" } as const;
+const CONFIDENCE_LABEL = { file: "설정 파일로 확인", inferred: "이름 · 종류로 추정", missing: "레포에 없음" } as const;
+
+function InfraLegend({ infra }: { infra: InfraMap }) {
+  const kinds = [...new Set(infra.nodes.map((n) => n.kind))];
+  return (
+    <>
+      <ul className="infra-legend">
+        {kinds.map((k) => (
+          <li key={k}>
+            <i style={{ background: INFRA_STYLE[k].color }} />
+            {INFRA_STYLE[k].label}
+          </li>
+        ))}
+      </ul>
+      <p className="gx-hint">
+        흐르는 실선 = 설정 파일로 확인 · 흐린 점선 = 추정 · 회색 = 레포에 없음. 노드를 누르면 근거 파일과 연결된 코드가 나와요.
+      </p>
+    </>
+  );
+}
+
+/** 인프라 노드 상세: 무엇인지, 근거 파일, 앞뒤 연결, 연결된 코드 파일 */
+function InfraCard({
+  infra,
+  id,
+  insights,
+  sourceBase,
+  onPickFile,
+  onPickNode,
+  onClose,
+}: {
+  infra: InfraMap;
+  id: string;
+  insights: Insights;
+  sourceBase: string | null;
+  onPickFile: (path: string) => void;
+  onPickNode: (id: string) => void;
+  onClose: () => void;
+}) {
+  const node = infra.nodes.find((n) => n.id === id);
+  if (!node) return null;
+  const style = INFRA_STYLE[node.kind];
+  const nameOf = (nid: string) => infra.nodes.find((n) => n.id === nid)?.label ?? nid;
+  const incoming = infra.links.filter((l) => l.to === id);
+  const outgoing = infra.links.filter((l) => l.from === id);
+  const code = infra.codeLinks.filter((c) => c.node === id);
+  const src = (file: string, line: number) => (sourceBase ? `${sourceBase}/${file}#L${line}` : null);
+  return (
+    <section className="gx-detail">
+      <div className="gx-detail-head">
+        <span className="gx-dot" style={{ background: style.color, boxShadow: `0 0 8px ${style.color}` }} />
+        <b>{node.label}</b>
+        <span className="gx-kind fn">{style.label}</span>
+        <button className="gx-x" onClick={onClose} aria-label="선택 해제">
+          ×
+        </button>
+      </div>
+      {node.detail && <p className="gx-path">{node.detail}</p>}
+      <p className={`infra-confidence ${node.confidence}`}>
+        {CONFIDENCE_LABEL[node.confidence]}
+        {node.env ? ` · ${node.env}` : ""}
+      </p>
+      {node.sources.length > 0 && (
+        <div className="gx-deps">
+          <h4>근거</h4>
+          <ul>
+            {node.sources.map((s) => {
+              const href = src(s.file, s.line);
+              return (
+                <li key={`${s.file}:${s.line}`}>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noreferrer" className="infra-src">
+                      {s.file}:{s.line} ↗
+                    </a>
+                  ) : (
+                    <span className="infra-src">
+                      {s.file}:{s.line}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {[
+        { title: "들어오는 연결", list: incoming.map((l) => ({ id: l.from, l })) },
+        { title: "나가는 연결", list: outgoing.map((l) => ({ id: l.to, l })) },
+      ].map((g) =>
+        g.list.length === 0 ? null : (
+          <div className="gx-deps" key={g.title}>
+            <h4>
+              {g.title} <span className="gx-dim">{g.list.length}</span>
+            </h4>
+            <ul>
+              {g.list.map(({ id: other, l }) => (
+                <li key={other}>
+                  <button className="infra-pick" onClick={() => onPickNode(other)}>
+                    {nameOf(other)}
+                  </button>
+                  <span className={`gx-dim infra-confidence ${l.confidence}`}>
+                    {CONFIDENCE_LABEL[l.confidence]}
+                    {l.label ? ` · ${l.label}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      )}
+      {code.length > 0 && (
+        <div className="gx-deps">
+          <h4>
+            연결된 코드 <span className="gx-dim">{code.length}</span>
+          </h4>
+          <ul>
+            {code.map((c) => (
+              <li key={c.file}>
+                <button className="infra-pick" onClick={() => onPickFile(c.file)} title={c.file}>
+                  {insights.byPath.get(c.file)?.name ?? c.file}
+                </button>
+                <span className="gx-dim">
+                  {CODE_LINK_LABEL[c.kind]}
+                  {c.detail ? ` · ${c.detail}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

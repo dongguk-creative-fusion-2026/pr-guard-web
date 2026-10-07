@@ -179,6 +179,8 @@ export type GraphData = {
   calls?: { source: string; target: string; weight: number }[];
   /** 최근 커밋(최대 1000개) 기준 git 이력. 예전 그래프에는 없다 */
   history?: GitHistory | null;
+  /** 인프라 지도. 예전 그래프에는 없다 */
+  infra?: InfraMap | null;
   stats: {
     files: number;
     connectedFiles: number;
@@ -191,6 +193,30 @@ export type GraphData = {
     shownCalls?: number;
     analyzeMs: number;
   };
+};
+
+export type InfraKind =
+  | "client" | "dns" | "tunnel" | "proxy" | "app" | "database" | "cache" | "queue"
+  | "storage" | "monitoring" | "external" | "platform" | "ci";
+
+/** 근거 수준: file = 설정 파일에 적혀 있음, inferred = 이름 · 종류로 추정, missing = 레포에 없음 */
+export type InfraConfidence = "file" | "inferred" | "missing";
+
+export type InfraMap = {
+  nodes: {
+    id: string;
+    kind: InfraKind;
+    label: string;
+    detail: string | null;
+    sources: { file: string; line: number }[];
+    confidence: InfraConfidence;
+    /** docker-compose · kubernetes … 어디서 정의됐는지 */
+    env: string | null;
+  }[];
+  links: { from: string; to: string; label: string | null; confidence: InfraConfidence; source: { file: string; line: number } | null }[];
+  /** 인프라 노드와 코드 파일: entry = 요청을 받는 진입점, data = DB 를 쓰는 코드, external = 외부 API 를 부르는 코드 */
+  codeLinks: { node: string; file: string; kind: "entry" | "data" | "external"; detail: string | null }[];
+  files: string[];
 };
 
 export type FileHistory = {
