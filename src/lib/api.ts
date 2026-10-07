@@ -289,6 +289,17 @@ export type ProjectRuntime = {
   trace: RuntimeTrace;
 };
 
+/** 레포의 AI 에이전트 규칙 파일 상태 (AGENTS.md · CLAUDE.md …) */
+export type AgentsInfo = {
+  existing: { path: string; htmlUrl: string; content: string }[];
+  build: { tool: "gradle" | "maven" | "npm" | "unknown"; wrapper: boolean; build: string | null; test: string | null; java: number | null };
+  /** PR Guard 봇이 이 레포에 브랜치 · PR 을 만들 수 있는가 */
+  canCreatePr: boolean;
+  /** 전에 올린 AGENTS.md PR 이 열려 있으면 그 주소 */
+  openPr: string | null;
+  defaultBranch: string;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -346,6 +357,9 @@ export const api = {
     call<ProjectRuntime | undefined>(`/api/projects/${id}/runtime`)
       .then((r) => r ?? null)
       .catch(() => null),
+  getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
+  createAgentsPull: (id: number, content: string) =>
+    call<{ url: string }>(`/api/projects/${id}/agents-md/pull`, { method: "POST", body: JSON.stringify({ content }) }),
   rerun: (id: number, number: number) =>
     call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };

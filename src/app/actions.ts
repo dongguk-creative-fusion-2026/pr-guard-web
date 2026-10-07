@@ -73,3 +73,13 @@ export async function deleteProject(projectId: number) {
   revalidatePath("/");
   redirect("/");
 }
+
+export async function createAgentsPull(projectId: number, content: string): Promise<{ url?: string; error?: string }> {
+  try {
+    const r = await api.createAgentsPull(projectId, content);
+    revalidatePath(`/projects/${projectId}/agents`);
+    return { url: r.url };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "PR 을 만들지 못했습니다" };
+  }
+}
