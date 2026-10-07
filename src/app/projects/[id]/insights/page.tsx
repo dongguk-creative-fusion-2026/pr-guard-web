@@ -49,6 +49,7 @@ export default async function InsightsPage({
       initialTab={TABS.includes(tab as InsightTab) ? (tab as InsightTab) : "city"}
       initialFile={file}
       initialTime={t !== undefined && Number.isInteger(Number(t)) ? Number(t) : undefined}
+      sourceBase={graph.commitSha ? `${project.htmlUrl}/blob/${graph.commitSha}` : null}
     />
   );
 }

@@ -4,6 +4,8 @@ import { Edges, Html, OrbitControls, QuadraticBezierLine } from "@react-three/dr
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import { PCFShadowMap, type Mesh, type MeshStandardMaterial } from "three";
+import type { InfraMap } from "@/lib/api";
+import { InfraLayer } from "./InfraLayer";
 import { heatColor, relativeDays, squarify, type FileMetric, type Insights, type TimeState } from "./metrics";
 
 export type CityColorMode = "hotspot" | "group" | "recent" | "test";
@@ -234,6 +236,9 @@ export function CodeCity({
   onSelect,
   time,
   impact,
+  infra,
+  selectedInfra = null,
+  onSelectInfra,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -241,8 +246,13 @@ export function CodeCity({
   onSelect: (path: string | null) => void;
   time?: TimeState | null;
   impact?: CityImpact | null;
+  /** 있으면 도시 둘레에 인프라 층을 그린다 */
+  infra?: InfraMap | null;
+  selectedInfra?: string | null;
+  onSelectInfra?: (id: string | null) => void;
 }) {
   const { size, districts, buildings, byPath } = useMemo(() => layoutCity(insights), [insights]);
+  const roofs = useMemo(() => new Map(buildings.map((b) => [b.file.path, { x: b.x, z: b.z, top: GROUND + b.h }])), [buildings]);
   const [, setHovered] = useState<string | null>(null);
   const [rotate, setRotate] = useState(true);
 
@@ -327,8 +337,12 @@ export function CodeCity({
       // three 최신판에서 PCFSoftShadowMap 이 빠져서 PCF 를 직접 고른다
       shadows={{ type: PCFShadowMap }}
       dpr={[1, 2]}
-      camera={{ position: [size * 1.05, size * 0.85, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
-      onPointerMissed={() => onSelect(null)}
+      // 인프라 층이 있으면 도시 둘레까지 보이게 조금 더 멀리서 시작한다
+      camera={{ position: infra ? [size * 0.95, size * 1.15, size * 1.75] : [size * 1.05, size * 0.85, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
+      onPointerMissed={() => {
+        onSelect(null);
+        onSelectInfra?.(null);
+      }}
     >
       <color attach="background" args={["#07070d"]} />
       <fog attach="fog" args={["#07070d", size * 1.3, size * 3.2]} />
@@ -379,8 +393,24 @@ export function CodeCity({
         <Arc key={a.key} from={a.from} to={a.to} color={a.color} width={a.width} flow={a.flow} />
       ))}
 
+      {infra && (
+        <InfraLayer
+          infra={infra}
+          size={size}
+          roofs={roofs}
+          selected={selectedInfra}
+          selectedFile={selected}
+          onSelect={(id) => {
+            onSelect(null);
+            onSelectInfra?.(id);
+          }}
+        />
+      )}
+
       <OrbitControls
         makeDefault
+        // 인프라 층(앞 · 왼쪽 입구)까지 화면 가운데에 오게 중심을 옮긴다
+        target={infra ? [-size * 0.16, 0, size * 0.12] : [0, 0, 0]}
         enableDamping
         autoRotate={rotate}
         autoRotateSpeed={0.35}
