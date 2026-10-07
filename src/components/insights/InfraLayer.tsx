@@ -17,6 +17,7 @@ export const INFRA_STYLE: Record<InfraKind, { color: string; label: string }> = 
   queue: { color: "#fbbf24", label: "큐" },
   storage: { color: "#2dd4bf", label: "스토리지" },
   monitoring: { color: "#a3e635", label: "모니터링" },
+  registry: { color: "#fb923c", label: "서비스 인프라" },
   external: { color: "#c084fc", label: "외부 API" },
   platform: { color: "#94a3b8", label: "배포 플랫폼" },
   ci: { color: "#94a3b8", label: "CI" },
@@ -31,7 +32,8 @@ type Roof = { x: number; z: number; top: number };
 
 /**
  * 인프라 노드를 도시 둘레에 놓는다.
- * 앞 = 요청이 들어오는 길(사용자 → DNS → 터널 → 프록시 → 앱 게이트), 오른쪽 = 저장소, 하늘 = 외부 API, 왼쪽 뒤 = 배포 · CI
+ * 앞 = 요청이 들어오는 길(사용자 → DNS → 터널 → 프록시 → 앱 게이트), 오른쪽 = 저장소, 하늘 = 외부 API,
+ * 왼쪽 = 디스커버리 · 설정 서버, 왼쪽 뒤 = 배포 · CI
  */
 export function layoutInfra(infra: InfraMap, size: number) {
   const pos = new Map<string, Pos>();
@@ -66,7 +68,12 @@ export function layoutInfra(infra: InfraMap, size: number) {
     const k = appDepth - d;
     ids.forEach((id, i) => pos.set(id, { x: gateX - k * gap, y: 0, z: gateZ + k * gap * 0.3 + spread(ids.length, i, size * 0.3) }));
   }
-  apps.forEach((a, i) => pos.set(a.id, { x: gateX + spread(apps.length, i, size * 0.6), y: 0, z: gateZ }));
+  // 서비스가 많으면 앞 가장자리를 더 넓게 쓴다
+  apps.forEach((a, i) => pos.set(a.id, { x: gateX + spread(apps.length, i, size * Math.min(1.1, 0.3 + apps.length * 0.15)), y: 0, z: gateZ }));
+
+  // 디스커버리 · 설정 서버: 앱들이 기대는 곳이라 도시 왼쪽 가장자리에 한 줄로
+  const registries = byKind(["registry"]);
+  registries.forEach((n, i) => pos.set(n.id, { x: -size * 0.68, y: 0, z: size * 0.25 + spread(registries.length, i, size * 0.5) }));
 
   const data = byKind(DATA_KINDS);
   // 저장소: 도시 오른쪽 뒤편에 두 줄로
@@ -162,6 +169,20 @@ function NodeShape({ kind, color, missing }: { kind: InfraKind; color: string; m
           <icosahedronGeometry args={[2, 0]} />
           {mat}
         </mesh>
+      );
+    case "registry":
+      // 서비스들이 등록하는 허브: 받침 위에 도는 고리
+      return (
+        <group>
+          <mesh position={[0, 0.5, 0]}>
+            <cylinderGeometry args={[1.6, 2, 1, 16]} />
+            {mat}
+          </mesh>
+          <mesh position={[0, 3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[1.8, 0.45, 12, 32]} />
+            {mat}
+          </mesh>
+        </group>
       );
     case "monitoring":
       return (
@@ -304,7 +325,7 @@ export function InfraLayer({
     const p = pos.get(id);
     if (!p) return null;
     const node = infra.nodes.find((n) => n.id === id)!;
-    const h = { client: 2.2, dns: 0.8, tunnel: 3, proxy: 5.2, app: 7, database: 4.2, cache: 4, queue: 2.4, external: 0, monitoring: 2, platform: 1.2, ci: 1.2, storage: 1.2 }[node.kind];
+    const h = { client: 2.2, dns: 0.8, tunnel: 3, proxy: 5.2, app: 7, database: 4.2, cache: 4, queue: 2.4, external: 0, monitoring: 2, registry: 4.2, platform: 1.2, ci: 1.2, storage: 1.2 }[node.kind];
     return { x: p.x, y: p.y + h, z: p.z };
   };
   // 고른 노드와 직접 이어진 노드 · 파일만 밝게
