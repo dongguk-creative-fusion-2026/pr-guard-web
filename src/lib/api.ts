@@ -169,7 +169,7 @@ export type GraphStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED";
 /** GitNexus 인덱스로 만든 의존성 그래프: 파일 단위 의존 + 그 파일들 안의 함수와 함수 간 호출 */
 export type GraphData = {
   /** id = 레포 안 파일 경로. community = GitNexus 가 찾은 기능 묶음 */
-  nodes: { id: string; community: string | null; symbols: number }[];
+  nodes: { id: string; community: string | null; symbols: number; /** 줄 수 (예전 그래프에는 없다) */ lines?: number }[];
   /** source 가 target 을 쓴다. types = 관계 종류별 개수 (IMPORTS, CALLS, INJECTS …) */
   edges: { source: string; target: string; weight: number; types: Record<string, number> }[];
   communities: { id: string; label: string; files: number }[];
@@ -177,6 +177,8 @@ export type GraphData = {
   functions?: { id: string; name: string; kind: string; file: string; line: number; endLine: number }[];
   /** source 함수가 target 함수를 호출한다 */
   calls?: { source: string; target: string; weight: number }[];
+  /** 최근 커밋(최대 1000개) 기준 git 이력. 예전 그래프에는 없다 */
+  history?: GitHistory | null;
   stats: {
     files: number;
     connectedFiles: number;
@@ -189,6 +191,25 @@ export type GraphData = {
     shownCalls?: number;
     analyzeMs: number;
   };
+};
+
+export type FileHistory = {
+  commits: number;
+  additions: number;
+  deletions: number;
+  authors: number;
+  topAuthor: string;
+  lastAt: string;
+  firstAt: string;
+};
+
+export type GitHistory = {
+  commits: number;
+  since: string | null;
+  until: string | null;
+  files: Record<string, FileHistory>;
+  /** 같이 바뀐 파일 쌍. confidence = 덜 바뀐 파일이 바뀔 때 다른 파일도 같이 바뀐 비율 */
+  coChanges: { a: string; b: string; support: number; confidence: number }[];
 };
 
 export type RepoGraph = {

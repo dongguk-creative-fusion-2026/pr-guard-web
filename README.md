@@ -18,6 +18,7 @@ src/
       ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
       ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
       ├─ graph/page.tsx    # 코드 그래프 전체 화면 (?file= · ?fn= 로 선택)
+      ├─ insights/         # 코드 인사이트: 코드 시티(3D) · 핫스팟 트리맵 · 숨은 결합 원형 다이어그램 (?tab=)
       ├─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5)
       └─ reviews/[reviewId]/page.tsx  (+ impact/page.tsx: PR 영향 그래프 전체 화면)
                            # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
@@ -29,6 +30,7 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    ├─ StageDetail.tsx      # 노드를 누르면 그 단계의 결과물
    ├─ ImpactGraph.tsx      # 바뀐 메서드 ↔ 호출부 그래프 (옛 시그니처 호출 강조)
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
+src/components/insights/   # 파일 지표 · 핫스팟 점수 · treemap 배치(metrics.ts), CodeCity(three.js), HotspotMap, CouplingWheel
 src/components/graph/
    ├─ GraphExplorer.tsx    # 코드 그래프 탐색 (sigma.js WebGL): 점 = 함수, 상자 = 파일. 검색 · 묶음 숨기기 · 함수/파일 선택
    ├─ graphModel.ts        # 묶음·색, 파일 배치(ForceAtlas2 + 상자 겹침 풀기), 상자 안 함수 배치
