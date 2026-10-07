@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { StageDetail } from "./StageDetail";
 import { StageNode, type StageFlowNode } from "./StageNode";
 import {
+  EXEC_STAGES,
   EDGES,
   GRAPH_STAGES,
   POSITIONS,
@@ -18,7 +19,19 @@ import {
 } from "./stages";
 import { usePipelineEvents } from "./usePipelineEvents";
 
-const nodeTypes = { stage: StageNode };
+/** 실행 검증 레인 뒤에 까는 묶음 상자 (누를 수 없는 배경) */
+function LaneNode({ data }: { data: { width: number; height: number; label: string } }) {
+  return (
+    <div className="exec-lane" style={{ width: data.width, height: data.height }}>
+      <span>{data.label}</span>
+    </div>
+  );
+}
+
+const nodeTypes = { stage: StageNode, lane: LaneNode };
+const NODE_W = 184;
+const NODE_H = 74;
+const LANE_PAD = 18;
 /** 이보다 좁으면 세로 배치 */
 const VERTICAL_BELOW = 900;
 const SPEEDS = [1, 2, 4] as const;
@@ -110,13 +123,30 @@ function Pipeline({ reviewId }: { reviewId: number }) {
     | undefined;
   const focus = selected ?? lastStage ?? null;
 
-  const nodes: StageFlowNode[] = GRAPH_STAGES.map((stage) => ({
+  const stageNodes: StageFlowNode[] = GRAPH_STAGES.map((stage) => ({
     id: stage,
     type: "stage",
     position: (vertical ? POSITIONS_VERTICAL : POSITIONS)[stage],
     data: { stage, state: states[stage], selected: focus === stage, vertical },
     draggable: false,
   }));
+  const lane = EXEC_STAGES.map((s) => (vertical ? POSITIONS_VERTICAL : POSITIONS)[s]);
+  const laneX = Math.min(...lane.map((p) => p.x)) - LANE_PAD;
+  const laneY = Math.min(...lane.map((p) => p.y)) - LANE_PAD - 16;
+  const laneNode = {
+    id: "exec-lane",
+    type: "lane",
+    position: { x: laneX, y: laneY },
+    data: {
+      width: Math.max(...lane.map((p) => p.x)) + NODE_W + LANE_PAD - laneX,
+      height: Math.max(...lane.map((p) => p.y)) + NODE_H + LANE_PAD - laneY,
+      label: "실행 검증 · 쿠버네티스",
+    },
+    draggable: false,
+    selectable: false,
+    zIndex: -1,
+  };
+  const nodes = [laneNode, ...stageNodes] as unknown as StageFlowNode[];
 
   const edges: Edge[] = EDGES.map(([source, target]) => {
     const t = states[target].status;
@@ -203,7 +233,7 @@ function Pipeline({ reviewId }: { reviewId: number }) {
           nodesConnectable={false}
           zoomOnScroll={false}
           preventScrolling={false}
-          onNodeClick={(_, node) => setSelected(node.id as Exclude<StageId, "REVIEW">)}
+          onNodeClick={(_, node) => node.type === "stage" && setSelected(node.id as Exclude<StageId, "REVIEW">)}
           colorMode="system"
           minZoom={0.3}
         >

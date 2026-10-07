@@ -160,6 +160,62 @@ export function StageDetail({ stage, state }: { stage: Exclude<StageId, "REVIEW"
         </>
       )}
 
+      {d && stage === "EXEC_PREPARE" && (
+        <p>
+          {d.runner === "KUBERNETES" ? "쿠버네티스 Job" : "Docker 컨테이너"} 2개 · 이미지 <code>{d.image}</code>
+          <br />
+          <span className="muted">
+            base <code>{d.base}</code> · head <code>{d.head}</code>
+          </span>
+        </p>
+      )}
+
+      {d && (stage === "EXEC_POD_BASE" || stage === "EXEC_POD_HEAD") && (
+        <p>
+          <code>{d.name}</code> 기동까지 {Math.round((d.ms ?? 0) / 1000)}초
+          <br />
+          <span className="muted">노드 배정 → 러너 이미지 받기 → 컨테이너 시작 (root 아님 · 권한 없음 · CPU/메모리 제한)</span>
+        </p>
+      )}
+
+      {d && (stage === "EXEC_TEST_BASE" || stage === "EXEC_TEST_HEAD") && (
+        <p>
+          테스트 {d.tests}개 · 실패 {d.failed}개 · 건너뜀 {d.skipped}개 · 종료 코드 {d.exitCode}
+          <br />
+          <span className="muted">clone → 빌드(Gradle · Maven) → 테스트 → JUnit 결과 전송</span>
+        </p>
+      )}
+
+      {d && stage === "EXEC_DIFF" && (
+        <>
+          {d.headFailed ? (
+            <p>
+              base 에서는 빌드 · 테스트가 됐지만 head 에서는 실패했습니다: {d.reason}
+            </p>
+          ) : (
+            <>
+              <p className="muted">base 에서 통과하던 테스트가 head 에서 실패하면 이번 PR 이 깨뜨린 것으로 봅니다 (BLOCKER).</p>
+              {(d.regressions ?? []).length === 0 && (d.newFailures ?? []).length === 0 ? (
+                <div className="empty">회귀 없음{d.fixed?.length ? ` · 고친 테스트 ${d.fixed.length}개` : ""}</div>
+              ) : (
+                <ul className="finding-list">
+                  {(d.regressions as string[]).map((n) => (
+                    <li key={n}>
+                      <span className="sev BLOCKER">회귀</span> <code>{n}</code>
+                    </li>
+                  ))}
+                  {(d.newFailures as string[]).map((n) => (
+                    <li key={n}>
+                      <span className="sev MAJOR">새 실패</span> <code>{n}</code>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </>
+      )}
+
       {d && stage === "VERDICT" && (
         <p>
           BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor} → <strong>{state.message}</strong>
