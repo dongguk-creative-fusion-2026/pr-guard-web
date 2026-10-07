@@ -76,9 +76,20 @@ export function GraphSection({ projectId, graph }: { projectId: number; graph: R
       {graph?.status === "FAILED" && graph.error && <pre className="graph-error">{graph.error}</pre>}
       <div className="graph-card-actions">
         {data && (
-          <Link href={`/projects/${projectId}/graph`} className="graph-open">
-            그래프 열기 →
-          </Link>
+          <>
+            <Link href={`/projects/${projectId}/graph`} className="graph-open">
+              그래프 열기 →
+            </Link>
+            <Link href={`/projects/${projectId}/insights?tab=city`} className="graph-more">
+              코드 시티
+            </Link>
+            <Link href={`/projects/${projectId}/insights?tab=hotspots`} className="graph-more">
+              핫스팟
+            </Link>
+            <Link href={`/projects/${projectId}/insights?tab=coupling`} className="graph-more">
+              숨은 결합
+            </Link>
+          </>
         )}
         <button
           className="graph-rebuild"
