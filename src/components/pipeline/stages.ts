@@ -200,6 +200,7 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
         `+${data.added} ~${data.modified} −${data.removed}`,
         `호출부 ${data.callers}`,
         ...(data.signatureChanged ? [`시그니처 ${data.signatureChanged}`] : []),
+        ...(data.logic != null ? [`로직 ${data.logic}`] : []),
       ];
     case "HISTORY":
       return [`커밋 ${data.commits}`, `동시 변경 ${data.coChanges?.length ?? 0}`];
