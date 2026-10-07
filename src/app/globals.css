@@ -3210,3 +3210,69 @@ a.button.primary {
   display: flex;
   flex-direction: column;
 }
+
+/* 리뷰에서 반복된 실수 → AGENTS.md 규칙 */
+.lessons h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 1.1rem;
+}
+
+.lessons h2 .muted {
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.lesson-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin: 10px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  opacity: 0.75;
+  transition: all 0.15s;
+}
+
+.lesson.on {
+  opacity: 1;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.lesson.repeated {
+  border-left: 4px solid var(--danger);
+}
+
+.lesson label {
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.lesson-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.lesson-rule {
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.lesson-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}

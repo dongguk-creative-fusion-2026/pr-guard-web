@@ -19,9 +19,9 @@ export default async function AgentsPage({ params }: { params: Promise<{ id: str
     throw e;
   }
   const repo = `${project.owner}/${project.name}`;
-  let info;
+  let info, lessons;
   try {
-    info = await api.getAgentsMd(id);
+    [info, lessons] = await Promise.all([api.getAgentsMd(id), api.getLessons(id)]);
   } catch (e) {
     return (
       <>
@@ -47,7 +47,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ id: str
         AI 코딩 에이전트는 레포 루트의 규칙 파일(AGENTS.md · CLAUDE.md 등)을 읽고 작업합니다. 이 파일이 없으면 에이전트는 빌드 방법 · 구조 ·
         조심할 곳을 모른 채 코드를 씁니다. PR Guard 가 레포 분석 결과로 초안을 만들었어요.
       </p>
-      <AgentsView projectId={id} repo={repo} info={info} draft={draft} />
+      <AgentsView projectId={id} repo={repo} info={info} draft={draft} lessons={lessons} />
     </>
   );
 }

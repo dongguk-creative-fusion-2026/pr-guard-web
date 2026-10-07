@@ -300,6 +300,19 @@ export type AgentsInfo = {
   defaultBranch: string;
 };
 
+/** 리뷰에서 반복된 실수 유형과 AGENTS.md 에 넣을 규칙 (백엔드 LessonService) */
+export type Lesson = {
+  type: string;
+  label: string;
+  rule: string;
+  prs: number[];
+  findings: number;
+  /** 서로 다른 PR 2개 이상에서 나옴 */
+  repeated: boolean;
+  worst: Severity;
+  examples: { prNumber: number; reviewId: number; severity: Severity; file: string | null; title: string }[];
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -358,6 +371,8 @@ export const api = {
       .then((r) => r ?? null)
       .catch(() => null),
   getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
+  /** 백엔드가 지원하지 않으면 빈 목록 */
+  getLessons: (id: number) => call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`).catch(() => [] as Lesson[]),
   createAgentsPull: (id: number, content: string) =>
     call<{ url: string }>(`/api/projects/${id}/agents-md/pull`, { method: "POST", body: JSON.stringify({ content }) }),
   rerun: (id: number, number: number) =>
