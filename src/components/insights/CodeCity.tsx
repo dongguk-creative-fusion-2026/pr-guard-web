@@ -5,10 +5,14 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import { PCFShadowMap, type Mesh, type MeshStandardMaterial } from "three";
 import type { InfraMap } from "@/lib/api";
+import { runtimeColor, type FileRuntime } from "../graph/runtime";
 import { InfraLayer } from "./InfraLayer";
 import { heatColor, relativeDays, squarify, type FileMetric, type Insights, type TimeState } from "./metrics";
 
-export type CityColorMode = "hotspot" | "group" | "recent" | "test";
+export type CityColorMode = "hotspot" | "group" | "recent" | "test" | "runtime";
+
+/** 런타임 모드에서 호로 그릴 파일 간 호출 수 */
+const RUNTIME_ARCS = 40;
 
 /** PR 영향 모드: 파일별 단계(0 = 바뀜, 1 = 직접, 2 = 간접), 지금 드러난 단계, 지적 수, 영향이 전달되는 파일 쌍 */
 export type CityImpact = {
@@ -76,6 +80,7 @@ export function buildingColor(f: FileMetric, mode: CityColorMode, insights: Insi
   if (mode === "group") return f.color;
   if (mode === "recent") return recencyColor(f.history?.lastAt, insights.until);
   if (mode === "test") return f.test ? "#4ade80" : "#3b3f5c";
+  if (mode === "runtime") return DIM;
   return heatColor(f.hotspot);
 }
 
@@ -239,6 +244,7 @@ export function CodeCity({
   infra,
   selectedInfra = null,
   onSelectInfra,
+  runtime,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -250,7 +256,11 @@ export function CodeCity({
   infra?: InfraMap | null;
   selectedInfra?: string | null;
   onSelectInfra?: (id: string | null) => void;
+  /** 런타임 모드: 테스트가 돌며 실제로 일어난 호출 (파일 단위) */
+  runtime?: FileRuntime | null;
 }) {
+  const live = mode === "runtime" && runtime ? runtime : null;
+  const liveHeat = (n: number) => (live ? Math.log(1 + n) / Math.log(1 + live.maxCalls) : 0);
   const { size, districts, buildings, byPath } = useMemo(() => layoutCity(insights), [insights]);
   const roofs = useMemo(() => new Map(buildings.map((b) => [b.file.path, { x: b.x, z: b.z, top: GROUND + b.h }])), [buildings]);
   const [, setHovered] = useState<string | null>(null);
@@ -259,9 +269,19 @@ export function CodeCity({
   // 고른 파일의 호출 상대
   const calls = useMemo(() => {
     if (!selected) return null;
+    if (live) {
+      // 런타임 모드: 실제로 일어난 호출만
+      const out = new Map<string, number>();
+      const inc = new Map<string, number>();
+      for (const l of live.links) {
+        if (l.from === selected) out.set(l.to, l.count);
+        if (l.to === selected) inc.set(l.from, l.count);
+      }
+      return { out, in: inc };
+    }
     const c = insights.fileCalls.get(selected);
     return { out: c?.out ?? new Map<string, number>(), in: c?.in ?? new Map<string, number>() };
-  }, [selected, insights.fileCalls]);
+  }, [selected, insights.fileCalls, live]);
   const related = useMemo(() => {
     if (!selected || !calls) return null;
     return new Set([selected, ...calls.out.keys(), ...calls.in.keys()]);
@@ -277,6 +297,14 @@ export function CodeCity({
       visible: true,
       badge: 0,
     };
+    if (live) {
+      const n = live.calls.get(b.file.path) ?? 0;
+      const t = liveHeat(n);
+      look =
+        n > 0
+          ? { color: runtimeColor(t), height: b.h, glow: 0.35 + t * 0.9, opacity: 1, visible: true, badge: 0 }
+          : { color: DIM, height: b.h * 0.55, glow: 0.02, opacity: 0.4, visible: true, badge: 0 };
+    }
     if (impact) {
       const level = impact.levels.get(b.file.path);
       const lit = level !== undefined && level <= impact.reveal;
@@ -320,6 +348,13 @@ export function CodeCity({
         const from = byPath.get(path);
         if (from) arcs.push({ key: `i${path}`, from, to: me, color: IN_COLOR, width: 1.5 + (n / max) * 3, flow: true });
       }
+    }
+  } else if (live) {
+    for (const l of live.links.slice(0, RUNTIME_ARCS)) {
+      const from = byPath.get(l.from);
+      const to = byPath.get(l.to);
+      const t = liveHeat(l.count);
+      if (from && to) arcs.push({ key: `${l.from}>${l.to}`, from, to, color: runtimeColor(t), width: 1.2 + t * 3, flow: true });
     }
   } else if (impact) {
     for (const l of impact.links) {
@@ -424,6 +459,7 @@ export function CodeCity({
 }
 
 export function cityLegend(mode: CityColorMode): { label: string; stops: string[]; left: string; right: string } {
+  if (mode === "runtime") return { label: "테스트 중 불린 횟수", stops: [DIM, runtimeColor(0), runtimeColor(0.5), runtimeColor(1)], left: "안 불림", right: "많이" };
   if (mode === "recent") return { label: "마지막 변경", stops: [heatColor(0), heatColor(0.5), heatColor(1)], left: "90일+ 전", right: "최근" };
   if (mode === "test") return { label: "테스트 파일", stops: ["#3b3f5c", "#4ade80"], left: "코드", right: "테스트" };
   if (mode === "group") return { label: "기능 묶음", stops: [], left: "", right: "" };

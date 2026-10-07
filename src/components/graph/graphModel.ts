@@ -70,7 +70,8 @@ export type NodeAttrs = {
   color: string;
 };
 
-export type EdgeAttrs = { size: number; color: string; weight: number };
+/** runtimeOnly: 정적 분석에는 없고 실행 중에만 일어난 호출 (런타임 오버레이가 더한 간선) */
+export type EdgeAttrs = { size: number; color: string; weight: number; runtimeOnly?: boolean };
 
 /** 파일 상자. x, y 는 왼쪽 위 (그래프 좌표에서 y 는 위로 갈수록 커지므로 화면에 그릴 때 뒤집는다) */
 export type FileBox = {

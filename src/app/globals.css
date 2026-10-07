@@ -2707,3 +2707,135 @@ button.small.primary {
   font-size: 11px;
   font-weight: 700;
 }
+
+/* 런타임 오버레이: 테스트가 돌며 실제로 일어난 호출 */
+.gx-stage .gx-flow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gx-runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid #2a2a40;
+  background: #12121e;
+  color: #9a9ab0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gx-runtime-toggle:hover {
+  color: #e4e4ed;
+  border-color: #3b3b58;
+}
+
+.gx-runtime-toggle.on {
+  color: #ecfeff;
+  border-color: #34d399;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(250, 204, 21, 0.12));
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.25);
+}
+
+.gx-runtime-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4b4b66;
+}
+
+.gx-runtime-toggle.on .gx-runtime-dot {
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+  animation: gx-runtime-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes gx-runtime-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.gx-runtime-legend {
+  align-items: center;
+}
+
+.gx-runtime-scale i {
+  width: 70px !important;
+  height: 7px !important;
+  margin: 0 6px !important;
+  border-radius: 4px !important;
+}
+
+.gx-runtime-info {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border-left: 3px solid;
+  border-radius: 6px;
+  background: #0f1418;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.gx-runtime-cold {
+  color: #8a8aa3;
+}
+
+.gx-tests {
+  margin: 6px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.gx-tests li {
+  padding: 2px 0;
+  color: #b8c4cc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gx-runtime-head p {
+  margin: 4px 0 12px;
+}
+
+.gx-runtime-ring {
+  --p: 0;
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 6px auto 14px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(closest-side, #0c0c16 79%, transparent 80% 100%),
+    conic-gradient(#22d3ee, #34d399 calc(var(--p) * 0.5%), #facc15 calc(var(--p) * 1%), #1d1e30 0);
+  box-shadow: 0 0 30px rgba(52, 211, 153, 0.12);
+}
+
+.gx-runtime-ring b {
+  font-size: 24px;
+  color: #ecfeff;
+}
+
+.gx-runtime-ring span {
+  font-size: 11px;
+  color: #8a8aa3;
+}
+
+.gx-runtime-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}

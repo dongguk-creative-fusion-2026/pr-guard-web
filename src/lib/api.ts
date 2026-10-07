@@ -268,6 +268,27 @@ export type PollResult = {
 };
 
 /** 백엔드 오류 응답 {timestamp, code, message} 를 그대로 담는다. */
+/**
+ * 테스트가 도는 동안 실제로 일어난 호출 (실행 검증 러너의 trace-agent 기록).
+ * methods 는 "com.a.Foo#bar" (생성자는 #<init>), edges 는 [호출하는 쪽, 불린 쪽, 횟수], tests 는 테스트 → 지나간 함수 번호
+ */
+export type RuntimeTrace = {
+  methods: string[];
+  counts: number[];
+  edges: [number, number, number][];
+  tests: Record<string, number[]>;
+};
+
+/** 프로젝트의 가장 최근 런타임 기록 (head 쪽) */
+export type ProjectRuntime = {
+  runId: number;
+  reviewId: number;
+  prNumber: number;
+  sha: string;
+  finishedAt: string | null;
+  trace: RuntimeTrace;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -320,6 +341,11 @@ export const api = {
       body: JSON.stringify({ commentEnabled, majorThreshold }),
     }),
   finishOnboarding: (id: number) => call<Project>(`/api/projects/${id}/onboarded`, { method: "POST" }),
+  /** 런타임 기록이 없거나 백엔드가 아직 지원하지 않으면 null */
+  getRuntime: (id: number) =>
+    call<ProjectRuntime | undefined>(`/api/projects/${id}/runtime`)
+      .then((r) => r ?? null)
+      .catch(() => null),
   rerun: (id: number, number: number) =>
     call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };
