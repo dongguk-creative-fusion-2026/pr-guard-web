@@ -40,6 +40,7 @@ const SIGNAL: Record<string, string> = {
   AUTH_REMOVED: "권한 검사 삭제",
   EXCEPTION_SWALLOWED: "예외 삼킴",
   CONDITION_CHANGED: "조건 변경",
+  CALL_TARGET_CHANGED: "호출 대상 변경",
 };
 
 /** com.a.PostService#getPost(Long) → PostService.getPost() */
