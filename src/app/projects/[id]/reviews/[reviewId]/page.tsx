@@ -12,6 +12,7 @@ import {
 } from "@/lib/format";
 import { computeImpact, type Impact } from "@/components/graph/impact";
 import { computeDelegation, touchedZones, ZONE_META, type FileZone, type Zone } from "@/lib/delegation";
+import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { ReviewMarkdown } from "../../ReviewMarkdown";
 
@@ -25,8 +26,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
 
   let detail;
   let graph;
+  let events;
   try {
-    [detail, graph] = await Promise.all([api.getReview(reviewId), api.getGraph(projectId)]);
+    [detail, graph, events] = await Promise.all([api.getReview(reviewId), api.getGraph(projectId), api.getReviewEvents(reviewId)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
@@ -74,6 +76,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
           {review.summary && <p>{review.summary}</p>}
+
+          <BehaviorCard rows={behaviorRows(events)} />
 
           {graph?.graph && context && (
             <ZoneCard zones={touchedZones(computeDelegation(graph.graph), (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)))} projectId={projectId} />
@@ -380,3 +384,27 @@ function ZoneCard({ zones, projectId }: { zones: FileZone[]; projectId: number }
     </div>
   );
 }
+
+/** 차등 비교 단계가 남긴 동작 diff 표 (실행 검증이 돈 리뷰만) */
+function behaviorRows(events: { stage: string; status: string; data: Record<string, unknown> | null }[]): BehaviorRow[] {
+  const diff = [...events].reverse().find((e) => e.stage === "EXEC_DIFF" && e.status === "DONE");
+  return (diff?.data?.behavior as BehaviorRow[] | undefined) ?? [];
+}
+
+/** 동작 diff 카드: 코드 대신 "같은 입력, 다른 결과" 를 리뷰 맨 위에서 보여 준다 */
+function BehaviorCard({ rows }: { rows: BehaviorRow[] }) {
+  if (rows.length === 0) return null;
+  const changed = rows.filter((r) => r.changed).length;
+  return (
+    <div className={`bd-card ${changed > 0 ? "changed" : ""}`}>
+      <div className="bd-card-head">
+        <b>동작 diff</b>
+        <span className="muted">
+          같은 입력으로 base 와 이 PR 을 실제로 실행한 결과 · {changed > 0 ? `${changed}곳에서 결과가 달라졌어요` : "결과가 모두 같아요"}
+        </span>
+      </div>
+      <BehaviorDiffTable rows={rows} compact />
+    </div>
+  );
+}
+

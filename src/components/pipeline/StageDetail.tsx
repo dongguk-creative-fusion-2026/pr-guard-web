@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { ImpactGraph } from "./ImpactGraph";
 import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
@@ -219,6 +220,13 @@ export function StageDetail({
                     </li>
                   ))}
                 </ul>
+              )}
+              {(d.behavior ?? []).length > 0 && (
+                <>
+                  <h3>동작 diff</h3>
+                  <p className="muted">같은 입력으로 base 와 head 를 돌린 결과입니다. 코드를 읽지 않고도 무엇이 달라졌는지 보입니다.</p>
+                  <BehaviorDiffTable rows={d.behavior} />
+                </>
               )}
               <EvidenceVerdicts evidence={d.evidence ?? []} coverage={d.coverage ?? []} traced={!!d.traced} projectId={projectId} />
             </>

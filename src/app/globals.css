@@ -3423,3 +3423,134 @@ a.button.primary {
   font-weight: 600;
   font-size: 13px;
 }
+
+/* 동작 diff: 같은 입력, base · head 결과 */
+.bd-card {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.bd-card.changed {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 7%, var(--surface)), var(--surface) 55%);
+}
+
+.bd-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bd-card-head b {
+  font-size: 1.05rem;
+}
+
+.bd-group + .bd-group {
+  margin-top: 14px;
+}
+
+.bd-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.bd-count {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.bd-count.on b {
+  color: var(--danger);
+}
+
+.bd table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.bd th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bd th:nth-child(1) {
+  width: 30%;
+}
+
+.bd th:nth-child(3) {
+  width: 28px;
+}
+
+.bd td {
+  padding: 6px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.bd tr.changed td {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.bd tr.changed td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.bd-label {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.bd-arrow {
+  text-align: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bd tr.changed .bd-arrow {
+  color: var(--danger);
+}
+
+.bd-out {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.bd.compact .bd-out {
+  max-height: 3.2em;
+  overflow: hidden;
+}
+
+.bd-out.thrown {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.bd-out.null {
+  color: var(--warn);
+}
+
+.bd-none {
+  color: var(--muted);
+  font-size: 12px;
+}
