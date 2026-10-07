@@ -2688,6 +2688,8 @@ button.small.primary {
   font-size: 11px;
   color: #a5b4fc !important;
   overflow-wrap: anywhere;
+}
+
 /* 실행 검증 레인 (파이프라인 그래프) */
 .exec-lane {
   position: relative;
