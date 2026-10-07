@@ -1,6 +1,6 @@
 "use client";
 
-import { Background, MarkerType, Position, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import { Background, MarkerType, Position, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
 import { useMemo } from "react";
 import type { StageData } from "./stages";
 
@@ -103,6 +103,8 @@ export function ImpactGraph({ data }: { data: StageData }) {
   }
   return (
     <div className="impact-graph" style={{ height: Math.min(height + 60, 520) }}>
+      {/* 파이프라인 그래프 안에 놓이므로 저장소를 따로 둔다 (같이 쓰면 바깥 노드가 섞여 그려진다) */}
+      <ReactFlowProvider>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -115,6 +117,7 @@ export function ImpactGraph({ data }: { data: StageData }) {
       >
         <Background gap={20} />
       </ReactFlow>
+      </ReactFlowProvider>
     </div>
   );
 }

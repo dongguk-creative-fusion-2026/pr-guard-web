@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
+import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
 import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
 
@@ -89,6 +90,7 @@ export function StageDetail({
             바뀐 메서드(오른쪽)와 그 메서드를 부르는 곳(왼쪽). 빨간 점선은 옛 시그니처로 부르는 호출부입니다.
           </p>
           <ImpactGraph data={d} />
+          {d.ast && <AstDiffView methods={d.ast} />}
         </>
       )}
 
