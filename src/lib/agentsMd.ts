@@ -1,6 +1,6 @@
 import { computeBriefing } from "@/components/graph/briefing";
 import { computeInsights } from "@/components/insights/metrics";
-import type { AgentsInfo, GraphData } from "./api";
+import type { AgentsInfo, GraphData, Lesson } from "./api";
 import { fileName } from "./format";
 
 const GROUPS = 8;
@@ -153,3 +153,30 @@ export function buildAgentsMd(repo: string, data: GraphData, info: AgentsInfo, c
 
   return { markdown: out.join("\n"), sources };
 }
+
+export const LESSONS_HEADING = "## 이 레포 리뷰에서 반복된 실수";
+
+/** 고른 반복 실수를 규칙 절로 만든다 */
+export function lessonsSection(lessons: Lesson[]): string {
+  if (lessons.length === 0) return "";
+  return [
+    LESSONS_HEADING,
+    "",
+    "PR Guard 리뷰에서 여러 PR 에 걸쳐 나온 지적을 규칙으로 옮긴 것입니다. 같은 실수를 반복하지 않습니다.",
+    "",
+    ...lessons.map((l) => `- **${l.label}**: ${l.rule} (근거: ${l.prs.map((n) => `PR #${n}`).join(", ")})`),
+    "",
+  ].join("\n");
+}
+
+/** 문서에 반복 실수 절을 넣는다. 이미 있으면 그 절을 바꾼다 (없앤 것도 반영) */
+export function withLessons(markdown: string, lessons: Lesson[]): string {
+  const section = lessonsSection(lessons);
+  const start = markdown.indexOf(LESSONS_HEADING);
+  if (start < 0) return section ? markdown.trimEnd() + "\n\n" + section : markdown;
+  const after = start + LESSONS_HEADING.length;
+  const next = markdown.slice(after).search(/\n## /);
+  const tail = next < 0 ? "" : markdown.slice(after + next + 1);
+  return (markdown.slice(0, start) + section + (tail ? "\n" + tail : "")).trimEnd() + "\n";
+}
+
