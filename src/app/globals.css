@@ -2413,3 +2413,163 @@ button.small.primary {
   margin: 8px 0 0;
   font-size: 11px;
 }
+
+/* 코드 시티: 지적 표시, 시간 여행, 함수 호출 */
+.city-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 0 12px rgba(225, 29, 72, 0.7);
+  pointer-events: none;
+}
+
+.tt {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #2a2a44;
+  background: rgba(12, 12, 22, 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.gx .tt-play {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.6);
+}
+
+.tt-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tt-main input[type="range"] {
+  width: 100%;
+  accent-color: #818cf8;
+}
+
+.tt-info {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12px;
+  color: #a5a5bd;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tt-info b {
+  color: #fde047;
+  font-size: 13px;
+}
+
+.tt-files {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #7a7a90;
+}
+
+.gx .tt-now {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #3a3a5a;
+  background: none;
+  color: #c7d2fe;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ins-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.gx .ins-actions button,
+.ins-actions a {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #2a2a40;
+  background: #11111c;
+  color: #c7d2fe !important;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ins-actions a:hover {
+  text-decoration: none;
+  border-color: #6366f1;
+}
+
+.ins-legend-line {
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+
+.ins-fns {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ins-fns li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 0;
+  border-bottom: 1px solid #16162a;
+  font-size: 12px;
+}
+
+.ins-fn-name em {
+  margin-left: 4px;
+  color: #6b6b80;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.ins-fn-calls {
+  font-size: 11px;
+}
+
+.ins-fn-calls.out {
+  color: #67e8f9;
+}
+
+.ins-fn-calls.in {
+  color: #f9a8d4;
+}
+
+.gx .ins-fn-calls button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.gx .ins-fn-calls button:hover {
+  text-decoration: underline;
+}

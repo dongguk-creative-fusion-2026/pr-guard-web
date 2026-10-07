@@ -18,9 +18,9 @@ src/
       ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
       ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
       ├─ graph/page.tsx    # 코드 그래프 전체 화면 (?file= · ?fn= 로 선택)
-      ├─ insights/         # 코드 인사이트: 코드 시티(3D) · 핫스팟 트리맵 · 숨은 결합 원형 다이어그램 (?tab=)
+      ├─ insights/         # 코드 인사이트: 코드 시티(3D, 시간 여행 · 호출 호) · 핫스팟 트리맵 · 숨은 결합 (?tab= · ?file= · ?t=)
       ├─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5)
-      └─ reviews/[reviewId]/page.tsx  (+ impact/page.tsx: PR 영향 그래프 전체 화면)
+      └─ reviews/[reviewId]/page.tsx  (+ impact/: PR 영향 그래프, city/: 3D 영향 시티)
                            # 리뷰 상세: 파이프라인 시각화, 판정, 지적 사항, 분석 재료
    └─ api/reviews/[id]/events/route.ts
                            # 백엔드 리뷰 단계 스트림(SSE) 중계

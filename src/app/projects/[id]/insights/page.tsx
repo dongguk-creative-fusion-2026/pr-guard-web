@@ -17,11 +17,11 @@ export default async function InsightsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; file?: string; t?: string }>;
 }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const { tab } = await searchParams;
+  const { tab, file, t } = await searchParams;
 
   let data;
   try {
@@ -47,6 +47,8 @@ export default async function InsightsPage({
       graphHref={`/projects/${id}/graph`}
       fontFamily={mono.style.fontFamily}
       initialTab={TABS.includes(tab as InsightTab) ? (tab as InsightTab) : "city"}
+      initialFile={file}
+      initialTime={t !== undefined && Number.isInteger(Number(t)) ? Number(t) : undefined}
     />
   );
 }

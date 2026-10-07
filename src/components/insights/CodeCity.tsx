@@ -1,11 +1,20 @@
 "use client";
 
-import { Edges, Html, OrbitControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { useMemo, useState } from "react";
-import { heatColor, relativeDays, squarify, type FileMetric, type Insights } from "./metrics";
+import { Edges, Html, OrbitControls, QuadraticBezierLine } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useMemo, useRef, useState } from "react";
+import { PCFShadowMap, type Mesh, type MeshStandardMaterial } from "three";
+import { heatColor, relativeDays, squarify, type FileMetric, type Insights, type TimeState } from "./metrics";
 
 export type CityColorMode = "hotspot" | "group" | "recent" | "test";
+
+/** PR 영향 모드: 파일별 단계(0 = 바뀜, 1 = 직접, 2 = 간접), 지금 드러난 단계, 지적 수, 영향이 전달되는 파일 쌍 */
+export type CityImpact = {
+  levels: Map<string, 0 | 1 | 2>;
+  reveal: number;
+  findings: Map<string, number>;
+  links: { from: string; to: string; level: 1 | 2 }[];
+};
 
 type Building = {
   file: FileMetric;
@@ -19,9 +28,13 @@ type Building = {
 type District = { label: string; color: string; x: number; z: number; w: number; d: number };
 
 const GROUND = 0.6;
+const DIM = "#1c1d2e";
+export const LEVEL_COLORS = ["#fde047", "#f43f5e", "#fb923c"] as const;
+const OUT_COLOR = "#22d3ee";
+const IN_COLOR = "#f472b6";
 
 /** 기능 묶음 = 구역, 파일 = 건물. 구역과 건물 바닥은 squarified treemap 으로 나눈다 */
-function layoutCity(insights: Insights) {
+export function layoutCity(insights: Insights) {
   const size = Math.max(60, Math.sqrt(insights.files.length) * 14);
   const maxLines = Math.max(1, ...insights.files.map((f) => f.lines));
   const footprint = (f: FileMetric) => 1 + f.functions * 0.6 + f.lines / 120;
@@ -48,7 +61,7 @@ function layoutCity(insights: Insights) {
       });
     }
   }
-  return { size, districts, buildings };
+  return { size, districts, buildings, byPath: new Map(buildings.map((b) => [b.file.path, b])) };
 }
 
 function recencyColor(iso: string | undefined | null, untilIso: string | null): string {
@@ -64,27 +77,44 @@ export function buildingColor(f: FileMetric, mode: CityColorMode, insights: Insi
   return heatColor(f.hotspot);
 }
 
+type Look = { color: string; height: number; glow: number; opacity: number; visible: boolean; badge: number };
+
+/** 건물 하나. 높이 · 빛은 목표값을 향해 매 프레임 조금씩 움직여 자라거나 줄어드는 것처럼 보인다 */
 function BuildingMesh({
   b,
-  color,
-  glow,
+  look,
   selected,
-  dimmed,
   onHover,
   onSelect,
 }: {
   b: Building;
-  color: string;
-  glow: number;
+  look: Look;
   selected: boolean;
-  dimmed: boolean;
   onHover: (path: string | null) => void;
   onSelect: (path: string) => void;
 }) {
+  const mesh = useRef<Mesh>(null);
+  const material = useRef<MeshStandardMaterial>(null);
   const [hover, setHover] = useState(false);
+  const height = useRef(look.visible ? look.height : 0.01);
+
+  useFrame((_, dt) => {
+    if (!mesh.current || !material.current) return;
+    const target = look.visible ? look.height : 0.01;
+    height.current += (target - height.current) * Math.min(1, dt * 5);
+    const h = Math.max(height.current, 0.01);
+    mesh.current.scale.y = h;
+    mesh.current.position.y = GROUND + h / 2;
+    mesh.current.visible = h > 0.05;
+    const glow = hover || selected ? 0.9 : look.glow;
+    material.current.emissiveIntensity += (glow - material.current.emissiveIntensity) * Math.min(1, dt * 6);
+  });
+
   return (
     <mesh
-      position={[b.x, GROUND + b.h / 2, b.z]}
+      ref={mesh}
+      position={[b.x, GROUND + height.current / 2, b.z]}
+      scale={[1, height.current, 1]}
       castShadow
       receiveShadow
       onPointerOver={(e) => {
@@ -103,61 +133,199 @@ function BuildingMesh({
         onSelect(b.file.path);
       }}
     >
-      <boxGeometry args={[b.w, b.h, b.d]} />
+      <boxGeometry args={[b.w, 1, b.d]} />
       <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={hover || selected ? 0.9 : dimmed ? 0.02 : 0.12 + glow * 0.75}
+        ref={material}
+        color={look.color}
+        emissive={look.color}
+        emissiveIntensity={look.glow}
         roughness={0.35}
         metalness={0.15}
-        transparent={dimmed}
-        opacity={dimmed ? 0.18 : 1}
+        transparent={look.opacity < 1}
+        opacity={look.opacity}
       />
       {(hover || selected) && <Edges color="#ffffff" />}
-      {hover && (
-        <Html position={[0, b.h / 2 + 1.2, 0]} center distanceFactor={undefined} zIndexRange={[20, 0]}>
-          <div className="city-tip">
-            <b>{b.file.name}</b>
-            <span>
-              {b.file.lines}줄 · 함수 {b.file.functions}
-              {b.file.history && ` · ${b.file.history.commits}번 변경`}
-            </span>
-          </div>
+      {(hover || look.badge > 0) && look.visible && (
+        <Html position={[0, 0.5, 0]} center zIndexRange={[20, 0]} style={{ transform: "translateY(-18px)" }}>
+          {hover ? (
+            <div className="city-tip">
+              <b>{b.file.name}</b>
+              <span>
+                {b.file.lines}줄 · 함수 {b.file.functions}
+                {b.file.history && ` · ${b.file.history.commits}번 변경`}
+              </span>
+            </div>
+          ) : (
+            <div className="city-badge">⚠ {look.badge}</div>
+          )}
         </Html>
       )}
     </mesh>
   );
 }
 
-/** 3D 코드 시티. 드래그로 돌리고 휠로 확대, 건물을 누르면 그 파일을 고른다 */
+/** 바뀐 건물 바닥에서 퍼지는 파동 고리 */
+function Ripple({ x, z, radius, delay }: { x: number; z: number; radius: number; delay: number }) {
+  const mesh = useRef<Mesh>(null);
+  const material = useRef<MeshStandardMaterial>(null);
+  useFrame(({ clock }) => {
+    if (!mesh.current || !material.current) return;
+    const t = ((clock.elapsedTime + delay) % 2.4) / 2.4;
+    const s = 0.5 + t * radius;
+    mesh.current.scale.set(s, s, s);
+    material.current.opacity = (1 - t) * 0.7;
+  });
+  return (
+    <mesh ref={mesh} position={[x, GROUND + 0.05, z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.85, 1, 64]} />
+      <meshStandardMaterial ref={material} color={LEVEL_COLORS[0]} emissive={LEVEL_COLORS[0]} emissiveIntensity={1.2} transparent opacity={0.6} />
+    </mesh>
+  );
+}
+
+/** 건물 지붕에서 지붕으로 휘는 빛나는 호. flow 면 점선이 흘러간다 */
+function Arc({
+  from,
+  to,
+  color,
+  width,
+  flow,
+}: {
+  from: Building;
+  to: Building;
+  color: string;
+  width: number;
+  flow: boolean;
+}) {
+  // drei 선 객체 (dashOffset 을 움직인다)
+  const line = useRef<{ material: { dashOffset: number } } | null>(null);
+  useFrame((_, dt) => {
+    if (flow && line.current) line.current.material.dashOffset -= dt * 1.6;
+  });
+  const dist = Math.hypot(to.x - from.x, to.z - from.z);
+  const top = Math.max(from.h, to.h);
+  return (
+    <QuadraticBezierLine
+      ref={line as never}
+      start={[from.x, GROUND + from.h + 0.3, from.z]}
+      end={[to.x, GROUND + to.h + 0.3, to.z]}
+      mid={[(from.x + to.x) / 2, GROUND + top + dist * 0.45 + 2, (from.z + to.z) / 2]}
+      color={color}
+      lineWidth={width}
+      dashed={flow}
+      dashSize={1.2}
+      gapSize={0.8}
+      transparent
+      opacity={0.9}
+    />
+  );
+}
+
+/**
+ * 3D 코드 시티. 드래그로 돌리고 휠로 확대, 건물을 누르면 그 파일을 고른다.
+ * - 고른 파일: 그 파일 함수가 부르는 파일(청록) · 그 파일을 부르는 파일(분홍)로 호가 떠오른다
+ * - time: 그 커밋 시점의 도시 (없는 파일은 땅속, 크기는 그때까지 쌓인 줄 수 비율, 방금 바뀐 건물은 번쩍)
+ * - impact: PR 이 바꾼 건물이 솟고 빛나며, 호출하는 건물로 단계별로 번진다
+ */
 export function CodeCity({
   insights,
   mode,
   selected,
   onSelect,
+  time,
+  impact,
 }: {
   insights: Insights;
   mode: CityColorMode;
   selected: string | null;
   onSelect: (path: string | null) => void;
+  time?: TimeState | null;
+  impact?: CityImpact | null;
 }) {
-  const { size, districts, buildings } = useMemo(() => layoutCity(insights), [insights]);
+  const { size, districts, buildings, byPath } = useMemo(() => layoutCity(insights), [insights]);
   const [, setHovered] = useState<string | null>(null);
   const [rotate, setRotate] = useState(true);
-  // 고른 파일과 같이 바뀌는 파일만 밝게 남긴다
-  const related = useMemo(() => {
+
+  // 고른 파일의 호출 상대
+  const calls = useMemo(() => {
     if (!selected) return null;
-    const set = new Set([selected]);
-    for (const c of insights.couplings) {
-      if (c.a === selected) set.add(c.b);
-      if (c.b === selected) set.add(c.a);
+    const c = insights.fileCalls.get(selected);
+    return { out: c?.out ?? new Map<string, number>(), in: c?.in ?? new Map<string, number>() };
+  }, [selected, insights.fileCalls]);
+  const related = useMemo(() => {
+    if (!selected || !calls) return null;
+    return new Set([selected, ...calls.out.keys(), ...calls.in.keys()]);
+  }, [selected, calls]);
+
+  const lookOf = (b: Building): Look => {
+    const base = buildingColor(b.file, mode, insights);
+    let look: Look = {
+      color: base,
+      height: b.h,
+      glow: 0.12 + (mode === "hotspot" ? (b.file.hotspot ?? 0) * 0.75 : 0),
+      opacity: 1,
+      visible: true,
+      badge: 0,
+    };
+    if (impact) {
+      const level = impact.levels.get(b.file.path);
+      const lit = level !== undefined && level <= impact.reveal;
+      look = lit
+        ? {
+            color: LEVEL_COLORS[level],
+            height: b.h * (level === 0 ? 1.35 : 1.1) + (level === 0 ? 2 : 0),
+            glow: level === 0 ? 1.1 : 0.7,
+            opacity: 1,
+            visible: true,
+            badge: impact.findings.get(b.file.path) ?? 0,
+          }
+        : { color: DIM, height: b.h * 0.7, glow: 0.02, opacity: 0.35, visible: true, badge: 0 };
     }
-    return set;
-  }, [selected, insights.couplings]);
+    if (time) {
+      const s = time.files.get(b.file.path);
+      if (s) {
+        look = {
+          ...look,
+          visible: s.visible,
+          height: b.h * s.grow,
+          color: s.flash > 0 ? "#fde047" : look.color,
+          glow: s.flash > 0 ? 0.6 + s.flash : look.glow,
+        };
+      }
+    }
+    if (related && !related.has(b.file.path)) look = { ...look, opacity: 0.16, glow: 0.02 };
+    return look;
+  };
+
+  const arcs: { key: string; from: Building; to: Building; color: string; width: number; flow: boolean }[] = [];
+  if (selected && calls) {
+    const me = byPath.get(selected);
+    const max = Math.max(1, ...calls.out.values(), ...calls.in.values());
+    if (me) {
+      for (const [path, n] of calls.out) {
+        const to = byPath.get(path);
+        if (to) arcs.push({ key: `o${path}`, from: me, to, color: OUT_COLOR, width: 1.5 + (n / max) * 3, flow: true });
+      }
+      for (const [path, n] of calls.in) {
+        const from = byPath.get(path);
+        if (from) arcs.push({ key: `i${path}`, from, to: me, color: IN_COLOR, width: 1.5 + (n / max) * 3, flow: true });
+      }
+    }
+  } else if (impact) {
+    for (const l of impact.links) {
+      if (l.level > impact.reveal) continue;
+      const from = byPath.get(l.from);
+      const to = byPath.get(l.to);
+      if (from && to) arcs.push({ key: `${l.from}>${l.to}`, from, to, color: LEVEL_COLORS[l.level], width: 2.2, flow: true });
+    }
+  }
+
+  const changed = impact && impact.reveal >= 0 ? buildings.filter((b) => impact.levels.get(b.file.path) === 0) : [];
 
   return (
     <Canvas
-      shadows
+      // three 최신판에서 PCFSoftShadowMap 이 빠져서 PCF 를 직접 고른다
+      shadows={{ type: PCFShadowMap }}
       dpr={[1, 2]}
       camera={{ position: [size * 1.05, size * 0.85, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
       onPointerMissed={() => onSelect(null)}
@@ -188,7 +356,7 @@ export function CodeCity({
         <group key={d.label}>
           <mesh position={[d.x, GROUND / 2, d.z]} receiveShadow>
             <boxGeometry args={[d.w, GROUND, d.d]} />
-            <meshStandardMaterial color={d.color} emissive={d.color} emissiveIntensity={0.08} transparent opacity={0.35} roughness={0.8} />
+            <meshStandardMaterial color={d.color} emissive={d.color} emissiveIntensity={0.08} transparent opacity={impact ? 0.15 : 0.35} roughness={0.8} />
             <Edges color={d.color} />
           </mesh>
           <Html position={[d.x - d.w / 2, GROUND + 0.2, d.z - d.d / 2]} zIndexRange={[10, 0]}>
@@ -200,16 +368,15 @@ export function CodeCity({
       ))}
 
       {buildings.map((b) => (
-        <BuildingMesh
-          key={b.file.path}
-          b={b}
-          color={buildingColor(b.file, mode, insights)}
-          glow={mode === "hotspot" ? b.file.hotspot ?? 0 : 0}
-          selected={selected === b.file.path}
-          dimmed={related !== null && !related.has(b.file.path)}
-          onHover={setHovered}
-          onSelect={onSelect}
-        />
+        <BuildingMesh key={b.file.path} b={b} look={lookOf(b)} selected={selected === b.file.path} onHover={setHovered} onSelect={onSelect} />
+      ))}
+
+      {changed.map((b, i) => (
+        <Ripple key={b.file.path} x={b.x} z={b.z} radius={size * 0.35} delay={i * 0.4} />
+      ))}
+
+      {arcs.map((a) => (
+        <Arc key={a.key} from={a.from} to={a.to} color={a.color} width={a.width} flow={a.flow} />
       ))}
 
       <OrbitControls
