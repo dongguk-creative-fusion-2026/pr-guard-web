@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { ImpactGraph } from "./ImpactGraph";
 import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
 
@@ -11,7 +12,15 @@ function fileName(path: string | null | undefined): string {
 }
 
 /** 선택한 단계가 만든 결과물. */
-export function StageDetail({ stage, state }: { stage: Exclude<StageId, "REVIEW">; state: StageState }) {
+export function StageDetail({
+  stage,
+  state,
+  projectId,
+}: {
+  stage: Exclude<StageId, "REVIEW">;
+  state: StageState;
+  projectId?: number;
+}) {
   const meta = STAGE_META[stage];
   const d = state.data;
   const ms = durationMs(state);
@@ -211,10 +220,13 @@ export function StageDetail({ stage, state }: { stage: Exclude<StageId, "REVIEW"
                   ))}
                 </ul>
               )}
+              <EvidenceVerdicts evidence={d.evidence ?? []} coverage={d.coverage ?? []} traced={!!d.traced} projectId={projectId} />
             </>
           )}
         </>
       )}
+
+      {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 
       {d && stage === "VERDICT" && (
         <p>

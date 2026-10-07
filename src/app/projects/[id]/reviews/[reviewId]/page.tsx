@@ -54,7 +54,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         )}
       </p>
 
-      <PipelineView reviewId={review.id} />
+      <PipelineView reviewId={review.id} projectId={projectId} />
 
       {review.status !== "DONE" ? (
         <div className="empty">
