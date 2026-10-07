@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const TABS: InsightTab[] = ["city", "hotspots", "coupling"];
-const MODES: CityColorMode[] = ["hotspot", "group", "recent", "test", "runtime"];
+const MODES: CityColorMode[] = ["hotspot", "group", "recent", "test", "runtime", "delegation"];
 
 /** 코드 인사이트 전체 화면: 코드 시티 · 핫스팟 · 숨은 결합 (?tab=) */
 export default async function InsightsPage({
