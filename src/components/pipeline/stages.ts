@@ -12,6 +12,12 @@ export type StageId =
   | "CHECK_C"
   | "CHECK_D"
   | "LLM"
+  | "EXEC_PREPARE"
+  | "EXEC_POD_BASE"
+  | "EXEC_POD_HEAD"
+  | "EXEC_TEST_BASE"
+  | "EXEC_TEST_HEAD"
+  | "EXEC_DIFF"
   | "VERDICT"
   | "PUBLISH"
   | "REVIEW";
@@ -52,6 +58,12 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿", icon: "🔐" },
   CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락", icon: "📈" },
   LLM: { label: "LLM 리뷰", hint: "근거 + diff", icon: "🤖" },
+  EXEC_PREPARE: { label: "E · 실행 준비", hint: "러너 이미지 · Job 생성", icon: "☸️" },
+  EXEC_POD_BASE: { label: "base Pod 기동", hint: "스케줄 · 이미지 · 기동", icon: "🚀" },
+  EXEC_POD_HEAD: { label: "head Pod 기동", hint: "스케줄 · 이미지 · 기동", icon: "🚀" },
+  EXEC_TEST_BASE: { label: "base 빌드 · 테스트", hint: "clone · 빌드 · 테스트", icon: "🧪" },
+  EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트", icon: "🧪" },
+  EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패", icon: "⚔️" },
   VERDICT: { label: "판정", hint: "규칙으로 계산", icon: "⚖️" },
   PUBLISH: { label: "PR 코멘트", hint: "요약 · 라인", icon: "💬" },
 };
@@ -74,6 +86,13 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   CHECK_C: { x: 5 * COL, y: 2 * ROW },
   CHECK_D: { x: 5 * COL, y: 3 * ROW },
   LLM: { x: 5 * COL, y: 4 * ROW },
+  // 실행 검증 레인: 소스 준비 뒤에서 아래로 갈라져 나란히 돌고 판정에 합류한다
+  EXEC_PREPARE: { x: 2 * COL, y: 5.9 * ROW },
+  EXEC_POD_BASE: { x: 3 * COL, y: 5.3 * ROW },
+  EXEC_POD_HEAD: { x: 3 * COL, y: 6.5 * ROW },
+  EXEC_TEST_BASE: { x: 4 * COL, y: 5.3 * ROW },
+  EXEC_TEST_HEAD: { x: 4 * COL, y: 6.5 * ROW },
+  EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
   VERDICT: { x: 6 * COL, y: 2 * ROW },
   PUBLISH: { x: 7 * COL, y: 2 * ROW },
 };
@@ -94,6 +113,13 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   CHECK_C: { x: VCOL, y: 5 * VROW },
   CHECK_D: { x: -VCOL / 2, y: 6 * VROW },
   LLM: { x: VCOL / 2, y: 6 * VROW },
+  // 실행 검증 레인은 오른쪽 열에
+  EXEC_PREPARE: { x: 2.1 * VCOL, y: 2 * VROW },
+  EXEC_POD_BASE: { x: 1.6 * VCOL, y: 3 * VROW },
+  EXEC_POD_HEAD: { x: 2.6 * VCOL, y: 3 * VROW },
+  EXEC_TEST_BASE: { x: 1.6 * VCOL, y: 4 * VROW },
+  EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
+  EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
   VERDICT: { x: 0, y: 7 * VROW },
   PUBLISH: { x: 0, y: 8 * VROW },
 };
@@ -115,6 +141,14 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["CHECK_C", "VERDICT"],
   ["CHECK_D", "VERDICT"],
   ["LLM", "VERDICT"],
+  ["CHECKOUT", "EXEC_PREPARE"],
+  ["EXEC_PREPARE", "EXEC_POD_BASE"],
+  ["EXEC_PREPARE", "EXEC_POD_HEAD"],
+  ["EXEC_POD_BASE", "EXEC_TEST_BASE"],
+  ["EXEC_POD_HEAD", "EXEC_TEST_HEAD"],
+  ["EXEC_TEST_BASE", "EXEC_DIFF"],
+  ["EXEC_TEST_HEAD", "EXEC_DIFF"],
+  ["EXEC_DIFF", "VERDICT"],
   ["VERDICT", "PUBLISH"],
 ];
 
@@ -129,7 +163,8 @@ export function reduceStates(events: ReviewEvent[]): Record<StageId, StageState>
     if (!s) continue;
     const t = Date.parse(e.at);
     if (e.status === "RUNNING") {
-      s.startedAt = t;
+      // 같은 단계가 진행 메시지만 바꿔 여러 번 올 수 있다 (예: 빌드 중 → 결과 보내는 중). 처음 시작 시각을 지킨다
+      if (s.status !== "RUNNING" || s.startedAt == null) s.startedAt = t;
     } else {
       s.endedAt = t;
       if (s.startedAt == null) s.startedAt = t;
@@ -166,6 +201,18 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
     case "CHECK_D":
     case "LLM":
       return [`지적 ${data.findings?.length ?? 0}`];
+    case "EXEC_PREPARE":
+      return [data.runner === "KUBERNETES" ? "K8s Job 2" : "컨테이너 2"];
+    case "EXEC_POD_BASE":
+    case "EXEC_POD_HEAD":
+      return data.ms != null ? [`기동 ${Math.round(data.ms / 1000)}s`] : [];
+    case "EXEC_TEST_BASE":
+    case "EXEC_TEST_HEAD":
+      return [`테스트 ${data.tests}`, `실패 ${data.failed}`];
+    case "EXEC_DIFF":
+      return data.headFailed
+        ? ["head 빌드 실패"]
+        : [`회귀 ${data.regressions?.length ?? 0}`, `새 실패 ${data.newFailures?.length ?? 0}`];
     case "VERDICT":
       return [`B ${data.blocker} · M ${data.major} · m ${data.minor}`];
     case "PUBLISH":
@@ -178,3 +225,6 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
 export function durationMs(s: StageState): number | null {
   return s.startedAt != null && s.endedAt != null ? s.endedAt - s.startedAt : null;
 }
+
+/** 실행 검증 레인 단계 (배경 묶음 상자를 그릴 때 쓴다) */
+export const EXEC_STAGES = ["EXEC_PREPARE", "EXEC_POD_BASE", "EXEC_POD_HEAD", "EXEC_TEST_BASE", "EXEC_TEST_HEAD", "EXEC_DIFF"] as const;
