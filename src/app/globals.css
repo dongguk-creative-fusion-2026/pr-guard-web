@@ -2688,6 +2688,8 @@ button.small.primary {
   font-size: 11px;
   color: #a5b4fc !important;
   overflow-wrap: anywhere;
+}
+
 /* 실행 검증 레인 (파이프라인 그래프) */
 .exec-lane {
   position: relative;
@@ -2704,4 +2706,337 @@ button.small.primary {
   color: #326ce5;
   font-size: 11px;
   font-weight: 700;
+}
+
+/* 런타임 오버레이: 테스트가 돌며 실제로 일어난 호출 */
+.gx-stage .gx-flow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gx-runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid #2a2a40;
+  background: #12121e;
+  color: #9a9ab0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gx-runtime-toggle:hover {
+  color: #e4e4ed;
+  border-color: #3b3b58;
+}
+
+.gx-runtime-toggle.on {
+  color: #ecfeff;
+  border-color: #34d399;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(250, 204, 21, 0.12));
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.25);
+}
+
+.gx-runtime-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4b4b66;
+}
+
+.gx-runtime-toggle.on .gx-runtime-dot {
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+  animation: gx-runtime-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes gx-runtime-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.gx-runtime-legend {
+  align-items: center;
+}
+
+.gx-runtime-scale i {
+  width: 70px !important;
+  height: 7px !important;
+  margin: 0 6px !important;
+  border-radius: 4px !important;
+}
+
+.gx-runtime-info {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border-left: 3px solid;
+  border-radius: 6px;
+  background: #0f1418;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.gx-runtime-cold {
+  color: #8a8aa3;
+}
+
+.gx-tests {
+  margin: 6px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.gx-tests li {
+  padding: 2px 0;
+  color: #b8c4cc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gx-runtime-head p {
+  margin: 4px 0 12px;
+}
+
+.gx-runtime-ring {
+  --p: 0;
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 6px auto 14px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(closest-side, #0c0c16 79%, transparent 80% 100%),
+    conic-gradient(#22d3ee, #34d399 calc(var(--p) * 0.5%), #facc15 calc(var(--p) * 1%), #1d1e30 0);
+  box-shadow: 0 0 30px rgba(52, 211, 153, 0.12);
+}
+
+.gx-runtime-ring b {
+  font-size: 24px;
+  color: #ecfeff;
+}
+
+.gx-runtime-ring span {
+  font-size: 11px;
+  color: #8a8aa3;
+}
+
+.gx-runtime-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* 증거 테스트 (실행 검증): 생성한 테스트와 base → head 판정 */
+.ev-list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 14px;
+}
+
+.ev-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ev-card.ev-PROVEN {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 9%, var(--surface)), var(--surface) 60%);
+}
+
+.ev-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ev-intent {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.ev-kind {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--muted);
+}
+
+.ev-kind-PROVEN {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.ev-kind-NO_CHANGE {
+  background: var(--ok);
+}
+
+.ev-kind-INVALID {
+  background: var(--warn);
+}
+
+.ev-sides {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+
+.ev-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 86px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.ev-side span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ev-side.PASSED b {
+  color: var(--ok);
+}
+
+.ev-side.FAILED b {
+  color: var(--danger);
+}
+
+.ev-side.FAILED {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+}
+
+.ev-arrow {
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.ev-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.ev-failure {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg));
+  color: var(--danger);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ev-code {
+  margin-top: 8px;
+}
+
+.ev-code-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ev-code pre {
+  margin: 6px 0 0;
+  padding: 10px 0;
+  max-height: 420px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0b0f17;
+  color: #d6deeb;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ev-line {
+  display: flex;
+  white-space: pre;
+}
+
+.ev-ln {
+  flex: none;
+  width: 38px;
+  padding-right: 10px;
+  text-align: right;
+  color: #4b5568;
+  user-select: none;
+}
+
+.ev-c {
+  color: #7f8ea3;
+}
+
+.ev-a {
+  color: #c792ea;
+}
+
+.ev-k {
+  color: #f78c6c;
+}
+
+.cov-list {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.cov-list li {
+  padding: 8px 12px;
+  border-left: 3px solid var(--ok);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.cov-list li.cov-none {
+  border-left-color: var(--warn);
+}
+
+.cov-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cov-tests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ev-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }

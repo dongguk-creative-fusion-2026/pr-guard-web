@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { GraphData, InfraMap } from "@/lib/api";
-import { formatTime } from "@/lib/format";
+import type { GraphData, InfraMap, ProjectRuntime } from "@/lib/api";
+import { fileName, formatTime, shortSha } from "@/lib/format";
+import { buildRuntime, fileRuntime, runtimeColor, type FileRuntime } from "../graph/runtime";
 import { cityLegend, CodeCity, type CityColorMode } from "./CodeCity";
 import { INFRA_STYLE } from "./InfraLayer";
 import { CouplingWheel } from "./CouplingWheel";
@@ -33,6 +34,7 @@ const MODES: { key: CityColorMode; label: string }[] = [
   { key: "group", label: "기능 묶음" },
   { key: "recent", label: "최근 변경" },
   { key: "test", label: "테스트" },
+  { key: "runtime", label: "⚡ 런타임" },
 ];
 
 const TOP = 10;
@@ -51,13 +53,33 @@ type Props = {
   initialTime?: number;
   /** 근거 파일을 GitHub 에서 열 때 쓰는 주소 (https://github.com/o/r/blob/커밋) */
   sourceBase?: string | null;
+  /** 가장 최근 실행 검증의 런타임 기록. 있으면 "런타임" 색 기준이 생긴다 */
+  runtime?: ProjectRuntime | null;
+  /** 처음 색 기준 (?mode=) */
+  initialMode?: CityColorMode;
 };
 
 /** 코드 인사이트: 코드 시티 · 핫스팟 · 숨은 결합 */
-export function InsightsView({ data, title, subtitle, backHref, graphHref, fontFamily, initialTab, initialFile, initialTime, sourceBase }: Props) {
+export function InsightsView({
+  data,
+  title,
+  subtitle,
+  backHref,
+  graphHref,
+  fontFamily,
+  initialTab,
+  initialFile,
+  initialTime,
+  sourceBase,
+  runtime,
+  initialMode,
+}: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
+  const live = useMemo(() => (runtime ? fileRuntime(buildRuntime(runtime, data), data) : null), [runtime, data]);
   const [tab, setTab] = useState<InsightTab>(initialTab);
-  const [mode, setMode] = useState<CityColorMode>(insights.hasHistory ? "hotspot" : "group");
+  const [mode, setMode] = useState<CityColorMode>(
+    initialMode && (initialMode !== "runtime" || live) ? initialMode : insights.hasHistory ? "hotspot" : "group",
+  );
   const [selected, setSelected] = useState<string | null>(initialFile && insights.byPath.has(initialFile) ? initialFile : null);
   const [hiddenOnly, setHiddenOnly] = useState(false);
   const [allCouplings, setAllCouplings] = useState(false);
@@ -75,12 +97,13 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
     if (path) setSelectedInfra(null);
   };
 
-  // 탭을 주소에 남긴다 (새로고침 · 공유)
+  // 탭 · 색 기준을 주소에 남긴다 (새로고침 · 공유)
   useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
+    url.searchParams.set("mode", mode);
     window.history.replaceState(null, "", url);
-  }, [tab]);
+  }, [tab, mode]);
 
   const current = selected ? insights.byPath.get(selected) ?? null : null;
 
@@ -113,6 +136,7 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
               infra={showInfra ? infra : null}
               selectedInfra={selectedInfra}
               onSelectInfra={setSelectedInfra}
+              runtime={live}
             />
           )}
           {tab === "city" && timeline && <TimeTravel timeline={timeline} index={timeIndex} setIndex={setTimeIndex} insights={insights} />}
@@ -142,7 +166,8 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
                   <button
                     key={m.key}
                     className={mode === m.key ? "active" : ""}
-                    disabled={!insights.hasHistory && (m.key === "hotspot" || m.key === "recent")}
+                    disabled={(!insights.hasHistory && (m.key === "hotspot" || m.key === "recent")) || (m.key === "runtime" && !live)}
+                    title={m.key === "runtime" && !live ? "실행 검증이 돈 PR 이 아직 없어요" : undefined}
                     onClick={() => setMode(m.key)}
                   >
                     {m.label}
@@ -183,6 +208,8 @@ export function InsightsView({ data, title, subtitle, backHref, graphHref, fontF
               infra={showInfra ? infra : null}
               onPickInfra={setSelectedInfra}
             />
+          ) : tab === "city" && mode === "runtime" && live ? (
+            <RuntimeList runtime={live} insights={insights} onPick={pickFile} />
           ) : tab === "coupling" ? (
             <CouplingList
               insights={insights}
@@ -718,6 +745,58 @@ function InfraCard({
             ))}
           </ul>
         </div>
+      )}
+    </section>
+  );
+}
+
+/** 런타임 모드 요약: 기록 출처 · 가장 많이 불린 파일 · 테스트가 안 지나간 코드 파일 */
+function RuntimeList({ runtime, insights, onPick }: { runtime: FileRuntime; insights: Insights; onPick: (path: string) => void }) {
+  const code = insights.files.filter((f) => !f.test);
+  const hot = code
+    .filter((f) => (runtime.calls.get(f.path) ?? 0) > 0)
+    .sort((a, b) => (runtime.calls.get(b.path) ?? 0) - (runtime.calls.get(a.path) ?? 0))
+    .slice(0, TOP);
+  const cold = code.filter((f) => !runtime.calls.has(f.path) && f.functions > 0).sort((a, b) => b.lines - a.lines);
+  const { source } = runtime;
+  return (
+    <section className="gx-impact-list">
+      <p className="gx-dim">
+        PR #{source.prNumber} head <code>{shortSha(source.sha)}</code> 에서 테스트를 돌리며 기록한 실제 호출
+        {source.finishedAt && ` · ${formatTime(source.finishedAt)}`}. 빛나는 호는 파일 사이에 실제로 오간 호출입니다.
+      </p>
+      <h4>가장 많이 불린 파일</h4>
+      <ul>
+        {hot.map((f) => {
+          const n = runtime.calls.get(f.path) ?? 0;
+          return (
+            <li key={f.path}>
+              <button onClick={() => onPick(f.path)} title={f.path}>
+                {fileName(f.path)}
+              </button>
+              <span className="gx-runtime-count" style={{ color: runtimeColor(Math.log(1 + n) / Math.log(1 + runtime.maxCalls)) }}>
+                ×{n.toLocaleString()}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <h4 style={{ color: "#8a8aa3" }}>
+        테스트가 한 번도 지나가지 않은 파일 <span className="gx-dim">{cold.length}</span>
+      </h4>
+      {cold.length === 0 ? (
+        <p className="gx-dim">없음</p>
+      ) : (
+        <ul>
+          {cold.slice(0, TOP).map((f) => (
+            <li key={f.path}>
+              <button onClick={() => onPick(f.path)} title={f.path}>
+                {fileName(f.path)}
+              </button>
+              <span className="gx-dim">{f.lines}줄</span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

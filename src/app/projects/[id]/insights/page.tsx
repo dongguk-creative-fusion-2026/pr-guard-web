@@ -1,6 +1,7 @@
 import { JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { CityColorMode } from "@/components/insights/CodeCity";
 import type { InsightTab } from "@/components/insights/InsightsView";
 import { api, ApiError } from "@/lib/api";
 import { shortSha } from "@/lib/format";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const TABS: InsightTab[] = ["city", "hotspots", "coupling"];
+const MODES: CityColorMode[] = ["hotspot", "group", "recent", "test", "runtime"];
 
 /** 코드 인사이트 전체 화면: 코드 시티 · 핫스팟 · 숨은 결합 (?tab=) */
 export default async function InsightsPage({
@@ -17,20 +19,20 @@ export default async function InsightsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; file?: string; t?: string }>;
+  searchParams: Promise<{ tab?: string; file?: string; t?: string; mode?: string }>;
 }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const { tab, file, t } = await searchParams;
+  const { tab, file, t, mode } = await searchParams;
 
   let data;
   try {
-    data = await Promise.all([api.getProject(id), api.getGraph(id)]);
+    data = await Promise.all([api.getProject(id), api.getGraph(id), api.getRuntime(id)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const [project, graph] = data;
+  const [project, graph, runtime] = data;
   if (!graph?.graph) {
     return (
       <div className="empty">
@@ -50,6 +52,8 @@ export default async function InsightsPage({
       initialFile={file}
       initialTime={t !== undefined && Number.isInteger(Number(t)) ? Number(t) : undefined}
       sourceBase={graph.commitSha ? `${project.htmlUrl}/blob/${graph.commitSha}` : null}
+      runtime={runtime}
+      initialMode={MODES.includes(mode as CityColorMode) ? (mode as CityColorMode) : undefined}
     />
   );
 }

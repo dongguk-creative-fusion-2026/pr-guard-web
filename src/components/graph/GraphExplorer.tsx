@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Sigma from "sigma";
 import type { NodeHoverDrawingFunction } from "sigma/rendering";
-import type { GraphData } from "@/lib/api";
-import { fileName } from "@/lib/format";
+import type { GraphData, ProjectRuntime } from "@/lib/api";
+import { fileName, formatTime, shortSha } from "@/lib/format";
 import {
   buildCodeGraph,
   groupCommunities,
@@ -18,6 +18,7 @@ import {
   type NodeAttrs,
 } from "./graphModel";
 import { worstSeverity, type Impact, type ImpactFunction } from "./impact";
+import { buildRuntime, edgeKey, heat, RUNTIME_ONLY_COLOR, runtimeColor, shortTest, type Runtime } from "./runtime";
 
 const BG = "#0a0a12";
 const DIM_NODE = "#24253a";
@@ -30,6 +31,8 @@ const INDIRECT_COLOR = "#fb923c";
 const LEVEL_COLOR = [CHANGE_COLOR, DIRECT_COLOR, INDIRECT_COLOR];
 const REVEAL_STEP_MS = 650;
 const LIST_PREVIEW = 8;
+// 런타임 오버레이: 흐르는 빛 알갱이를 그릴 호출 수 상한
+const FLOW_LIMIT = 260;
 
 type Selection = { kind: "fn"; id: string } | { kind: "file"; path: string } | null;
 
@@ -47,6 +50,10 @@ type Props = {
   impact?: Impact;
   /** 영향 모드 패널 맨 위 (판정 등) */
   impactHeader?: ReactNode;
+  /** 있으면 런타임 오버레이: 테스트가 돌며 실제로 불린 함수 · 호출 */
+  runtime?: ProjectRuntime | null;
+  /** 처음부터 런타임 오버레이를 켠다 (?runtime=1) */
+  initialRuntime?: boolean;
 };
 
 type NodeDisplay = Partial<NodeAttrs> & { highlighted?: boolean; forceLabel?: boolean; zIndex?: number; hidden?: boolean };
@@ -100,15 +107,28 @@ export function GraphExplorer({
   initialFunction,
   impact,
   impactHeader,
+  runtime,
+  initialRuntime,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const boxCanvas = useRef<HTMLCanvasElement>(null);
+  const flowCanvas = useRef<HTMLCanvasElement>(null);
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null);
 
-  const { groups, graph, boxes } = useMemo(() => {
+  const { groups, graph, boxes, rt } = useMemo(() => {
     const { groups, groupOf } = groupCommunities(data);
-    return { groups, ...buildCodeGraph(data, groups, groupOf) };
-  }, [data]);
+    const built = buildCodeGraph(data, groups, groupOf);
+    const rt = runtime ? buildRuntime(runtime, data) : null;
+    // 정적 분석에는 없고 실행 중에만 일어난 호출 (인터페이스 구현 · 상속 · 프레임워크 호출)을 간선으로 더한다
+    if (rt) {
+      for (const [k, n] of rt.edges) {
+        const [s, t] = k.split("\u0000");
+        if (!built.graph.hasNode(s) || !built.graph.hasNode(t) || built.graph.hasDirectedEdge(s, t)) continue;
+        built.graph.addDirectedEdge(s, t, { size: 1.4, color: RUNTIME_ONLY_COLOR, weight: n, runtimeOnly: true });
+      }
+    }
+    return { groups, ...built, rt };
+  }, [data, runtime]);
 
   const [selected, setSelected] = useState<Selection>(() => {
     if (initialFunction && graph.hasNode(initialFunction)) return { kind: "fn", id: initialFunction };
@@ -123,6 +143,7 @@ export function GraphExplorer({
   // 영향이 퍼지는 연출: -1(아무것도) → 0(바뀐 함수) → 1 → 2
   const [reveal, setReveal] = useState(impact ? -1 : 2);
   const [onlyImpact, setOnlyImpact] = useState(false);
+  const [runtimeOn, setRuntimeOn] = useState(!!initialRuntime && !!runtime);
 
   /** 지금 강조할 함수: 중심(고른 함수 · 고른 파일의 함수)과 그 호출 상대 */
   const focus = useMemo(() => {
@@ -135,8 +156,8 @@ export function GraphExplorer({
   }, [hovered, selected, graph, boxes]);
 
   // 리듀서와 상자 그리기는 sigma 안에서 불리므로 최신 상태를 ref 로 넘긴다
-  const view = useRef({ focus, hidden, reveal, onlyImpact, pulse: 0 });
-  view.current = { ...view.current, focus, hidden, reveal, onlyImpact };
+  const view = useRef({ focus, hidden, reveal, onlyImpact, runtimeOn, pulse: 0 });
+  view.current = { ...view.current, focus, hidden, reveal, onlyImpact, runtimeOn };
 
   useEffect(() => {
     if (!container.current) return;
@@ -163,9 +184,28 @@ export function GraphExplorer({
       stagePadding: 30,
       zIndex: true,
       nodeReducer: (node, attrs) => {
-        const { focus, reveal, onlyImpact, pulse } = view.current;
+        const { focus, reveal, onlyImpact, runtimeOn, pulse } = view.current;
         const res: NodeDisplay = { ...attrs };
         if (groupHidden(node)) return { ...res, hidden: true };
+        if (runtimeOn && rt) {
+          // 실행된 함수는 불린 횟수만큼 뜨겁게, 한 번도 안 불린 함수는 어둡게
+          const n = rt.calls.get(node) ?? 0;
+          if (n > 0) {
+            const t = heat(rt, n);
+            res.color = runtimeColor(t);
+            res.size = attrs.size * (1 + t * 0.9);
+            res.zIndex = 2;
+          } else {
+            res.color = DIM_NODE;
+            res.zIndex = 0;
+          }
+          if (focus) {
+            if (focus.core.has(node)) return { ...res, size: (res.size ?? attrs.size) * 1.5, zIndex: 3, forceLabel: true };
+            if (focus.related.has(node)) return { ...res, zIndex: 2, forceLabel: true };
+            return { ...res, color: DIM_NODE, label: "", zIndex: 0 };
+          }
+          return n > 0 ? res : { ...res, label: "" };
+        }
         const hit = impact?.functions.get(node);
         if (hit && hit.findings.length > 0) res.label = `${attrs.label} ⚠${hit.findings.length}`;
         if (focus) {
@@ -187,9 +227,23 @@ export function GraphExplorer({
         return { ...res, color: INDIRECT_COLOR, zIndex: 1 };
       },
       edgeReducer: (edge, attrs) => {
-        const { focus, reveal, onlyImpact } = view.current;
+        const { focus, reveal, onlyImpact, runtimeOn } = view.current;
         const [source, target] = graph.extremities(edge);
         if (groupHidden(source) || groupHidden(target)) return { ...attrs, hidden: true };
+        const runtimeOnly = graph.getEdgeAttribute(edge, "runtimeOnly") === true;
+        if (!runtimeOn && runtimeOnly) return { ...attrs, hidden: true };
+        if (runtimeOn && rt) {
+          const n = rt.edges.get(edgeKey(source, target)) ?? 0;
+          if (focus && !focus.core.has(source) && !focus.core.has(target)) return { ...attrs, color: DIM_EDGE, zIndex: 0 };
+          if (n === 0) return { ...attrs, color: DIM_EDGE, zIndex: 0 };
+          const t = heat(rt, n);
+          return {
+            ...attrs,
+            color: runtimeOnly ? RUNTIME_ONLY_COLOR : runtimeColor(t),
+            size: attrs.size * (1.4 + t) + 0.2,
+            zIndex: 2,
+          };
+        }
         if (focus) {
           if (focus.core.has(source)) return { ...attrs, color: OUT_COLOR, size: attrs.size * 1.8, zIndex: 2 };
           if (focus.core.has(target)) return { ...attrs, color: IN_COLOR, size: attrs.size * 1.8, zIndex: 2 };
@@ -319,7 +373,87 @@ export function GraphExplorer({
 
   useEffect(() => {
     sigmaRef.current?.refresh({ skipIndexation: true });
-  }, [focus, hidden, reveal, onlyImpact]);
+  }, [focus, hidden, reveal, onlyImpact, runtimeOn]);
+
+  // 런타임 오버레이: 실제로 일어난 호출을 따라 빛 알갱이가 흐른다 (많이 불린 호출일수록 빠르고 많이)
+  useEffect(() => {
+    const sigma = sigmaRef.current;
+    const canvas = flowCanvas.current;
+    const el = container.current;
+    if (!runtimeOn || !rt || !sigma || !canvas || !el) {
+      canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+    const flows = [...rt.edges.entries()]
+      .map(([k, n]) => {
+        const [s, t] = k.split("\u0000");
+        return { s, t, n, heat: heat(rt, n), seed: Math.random() };
+      })
+      .filter((f) => graph.hasNode(f.s) && graph.hasNode(f.t))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, FLOW_LIMIT);
+    let frame = 0;
+    const draw = (time: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const { width, height } = el.getBoundingClientRect();
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+      }
+      const ctx = canvas.getContext("2d")!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      const { focus, hidden } = view.current;
+      ctx.globalCompositeOperation = "lighter";
+      for (const f of flows) {
+        if (focus && !focus.core.has(f.s) && !focus.core.has(f.t)) continue;
+        const sd = sigma.getNodeDisplayData(f.s);
+        const td = sigma.getNodeDisplayData(f.t);
+        if (!sd || !td || sd.hidden || td.hidden) continue;
+        const boxS = boxes.get(graph.getNodeAttribute(f.s, "file"));
+        const boxT = boxes.get(graph.getNodeAttribute(f.t, "file"));
+        if ((boxS?.group != null && hidden.has(boxS.group)) || (boxT?.group != null && hidden.has(boxT.group))) continue;
+        const a = sigma.framedGraphToViewport(sd);
+        const b = sigma.framedGraphToViewport(td);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        if (Math.hypot(dx, dy) < 6) continue;
+        // sigma 곡선 간선과 같은 제어점 (곡률 0.25)
+        const cx = (a.x + b.x) / 2 + dy * 0.25;
+        const cy = (a.y + b.y) / 2 - dx * 0.25;
+        const color = graph.getEdgeAttribute(graph.edge(f.s, f.t) ?? "", "runtimeOnly") ? RUNTIME_ONLY_COLOR : runtimeColor(f.heat);
+        const particles = 1 + Math.round(f.heat * 2);
+        const speed = 0.00025 + f.heat * 0.00055;
+        for (let i = 0; i < particles; i++) {
+          const u = (time * speed + f.seed + i / particles) % 1;
+          const v = 1 - u;
+          const x = v * v * a.x + 2 * v * u * cx + u * u * b.x;
+          const y = v * v * a.y + 2 * v * u * cy + u * u * b.y;
+          const r = 1.6 + f.heat * 1.6;
+          const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+          glow.addColorStop(0, color);
+          glow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(x, y, r * 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+      frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [runtimeOn, rt, graph, boxes, ready]);
+
+  // 오버레이 상태를 주소에 남긴다
+  useEffect(() => {
+    if (!rt) return;
+    const url = new URL(window.location.href);
+    if (runtimeOn) url.searchParams.set("runtime", "1");
+    else url.searchParams.delete("runtime");
+    window.history.replaceState(null, "", url);
+  }, [runtimeOn, rt]);
 
   // 영향 모드: 바뀐 함수부터 한 단계씩 드러내고, 바뀐 함수는 계속 맥동시킨다
   useEffect(() => {
@@ -413,9 +547,22 @@ export function GraphExplorer({
 
   let panel: ReactNode;
   if (selected?.kind === "fn" && graph.hasNode(selected.id)) {
-    panel = <FunctionDetail id={selected.id} graph={graph} boxes={boxes} impact={impact} onPickFn={pickFn} onPickFile={pickFile} onClose={() => setSelected(null)} />;
+    panel = (
+      <FunctionDetail
+        id={selected.id}
+        graph={graph}
+        boxes={boxes}
+        impact={impact}
+        runtime={runtimeOn ? rt : null}
+        onPickFn={pickFn}
+        onPickFile={pickFile}
+        onClose={() => setSelected(null)}
+      />
+    );
   } else if (selected?.kind === "file" && boxes.has(selected.path)) {
     panel = <FileDetail box={boxes.get(selected.path)!} data={data} graph={graph} impact={impact} onPickFn={pickFn} onPickFile={pickFile} onClose={() => setSelected(null)} />;
+  } else if (runtimeOn && rt) {
+    panel = <RuntimePanel runtime={rt} graph={graph} onPickFn={pickFn} />;
   } else if (impact) {
     panel = <ImpactPanel impact={impact} header={impactHeader} onlyImpact={onlyImpact} setOnlyImpact={setOnlyImpact} onPickFn={pickFn} onPickFile={pickFile} />;
   } else {
@@ -522,18 +669,38 @@ export function GraphExplorer({
             </ul>
           )}
         </div>
+        {rt && (
+          <button
+            className={`gx-runtime-toggle${runtimeOn ? " on" : ""}`}
+            onClick={() => setRuntimeOn((v) => !v)}
+            title={`PR #${rt.source.prNumber} head 에서 테스트를 돌리며 기록한 실제 호출`}
+          >
+            <span className="gx-runtime-dot" />
+            런타임
+          </button>
+        )}
       </header>
 
       <div className="gx-body">
         <div className="gx-stage">
           <canvas className="gx-boxes" ref={boxCanvas} />
           <div className="gx-canvas" ref={container} />
+          <canvas className="gx-flow" ref={flowCanvas} />
         </div>
         <div className="gx-zoom">
           <button onClick={() => camera("in")} aria-label="확대">+</button>
           <button onClick={() => camera("out")} aria-label="축소">−</button>
           <button onClick={() => camera("reset")} aria-label="전체 보기">⤢</button>
         </div>
+        {runtimeOn && rt && (
+          <div className="gx-legend-float gx-runtime-legend">
+            <span className="gx-runtime-scale">
+              적게 <i style={{ background: `linear-gradient(90deg, ${[0, 0.33, 0.66, 1].map(runtimeColor).join(", ")})` }} /> 많이 불림
+            </span>
+            <span><i style={{ background: RUNTIME_ONLY_COLOR }} />실행 중에만 보인 호출</span>
+            <span><i style={{ background: DIM_NODE }} />한 번도 안 불림</span>
+          </div>
+        )}
         {impact && !selected && (
           <div className="gx-legend-float">
             <span><i style={{ background: CHANGE_COLOR }} />바뀐 함수</span>
@@ -630,6 +797,7 @@ function FunctionDetail({
   graph,
   boxes,
   impact,
+  runtime,
   onPickFn,
   onPickFile,
   onClose,
@@ -638,12 +806,22 @@ function FunctionDetail({
   graph: CodeGraph;
   boxes: Map<string, FileBox>;
   impact?: Impact;
+  runtime?: Runtime | null;
   onPickFn: (id: string) => void;
   onPickFile: (path: string) => void;
   onClose: () => void;
 }) {
   const a = graph.getNodeAttributes(id);
   const hit = impact?.functions.get(id);
+  const [allTests, setAllTests] = useState(false);
+  const calls = runtime?.calls.get(id) ?? 0;
+  const tests = runtime?.tests.get(id) ?? [];
+  const runtimeOnly = runtime
+    ? [
+        ...graph.outEdges(id).filter((e) => graph.getEdgeAttribute(e, "runtimeOnly")).map((e) => graph.target(e)),
+        ...graph.inEdges(id).filter((e) => graph.getEdgeAttribute(e, "runtimeOnly")).map((e) => graph.source(e)),
+      ]
+    : [];
   return (
     <section className="gx-detail">
       <div className="gx-detail-head">
@@ -667,6 +845,49 @@ function FunctionDetail({
           </div>
           {hit.reason && <div className="gx-dim">{hit.reason}</div>}
           <FindingList findings={hit.findings} />
+        </div>
+      )}
+      {runtime && !a.placeholder && (
+        <div className="gx-runtime-info" style={{ borderColor: calls > 0 ? runtimeColor(heat(runtime, calls)) : "#3a3b52" }}>
+          {calls > 0 ? (
+            <>
+              <div>
+                <b style={{ color: runtimeColor(heat(runtime, calls)) }}>테스트 중 {calls.toLocaleString()}번 실행</b>
+                <span className="gx-dim"> · 지나간 테스트 {tests.length}개</span>
+              </div>
+              <ul className="gx-tests">
+                {(allTests ? tests : tests.slice(0, LIST_PREVIEW)).map((t) => {
+                  const fn = runtime.testFns.get(t);
+                  return (
+                    <li key={t}>
+                      {fn && graph.hasNode(fn) ? (
+                        <button className="gx-fn" onClick={() => onPickFn(fn)} title={t}>
+                          🧪 {shortTest(t)}
+                        </button>
+                      ) : (
+                        <span title={t}>🧪 {shortTest(t)}</span>
+                      )}
+                    </li>
+                  );
+                })}
+                {tests.length > LIST_PREVIEW && (
+                  <li>
+                    <button className="gx-more" onClick={() => setAllTests((v) => !v)}>
+                      {allTests ? "접기" : `${tests.length - LIST_PREVIEW}개 더 보기`}
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </>
+          ) : (
+            <b className="gx-runtime-cold">테스트가 한 번도 실행하지 않은 함수</b>
+          )}
+          {runtimeOnly.length > 0 && (
+            <div className="gx-dim">
+              <span style={{ color: RUNTIME_ONLY_COLOR }}>정적 분석에 없던 실제 호출</span>{" "}
+              {runtimeOnly.map((n) => graph.getNodeAttribute(n, "label")).join(", ")}
+            </div>
+          )}
         </div>
       )}
       <CallList title={a.placeholder ? "이 파일이 쓰는 파일" : "이 함수가 호출하는 함수"} color={OUT_COLOR} ids={graph.outNeighbors(id)} graph={graph} onPick={onPickFn} />
@@ -876,6 +1097,83 @@ function ImpactPanel({
         {section("changed", "바뀐 함수", "", CHANGE_COLOR, impact.changed)}
         {section("direct", "직접 영향", "바뀐 함수를 호출", DIRECT_COLOR, impact.direct)}
         {section("indirect", "간접 영향", "직접 영향 함수를 호출", INDIRECT_COLOR, impact.indirect)}
+      </section>
+    </>
+  );
+}
+
+/** 런타임 오버레이 요약: 기록 출처, 실행 비율, 가장 많이 불린 함수, 정적 분석이 놓친 호출 */
+function RuntimePanel({ runtime, graph, onPickFn }: { runtime: Runtime; graph: CodeGraph; onPickFn: (id: string) => void }) {
+  const fns = graph.filterNodes((_, a) => !a.placeholder);
+  const executed = fns.filter((id) => (runtime.calls.get(id) ?? 0) > 0);
+  const hot = [...executed].sort((a, b) => (runtime.calls.get(b) ?? 0) - (runtime.calls.get(a) ?? 0)).slice(0, LIST_PREVIEW);
+  const onlyRuntime = graph.filterEdges((_, a) => a.runtimeOnly === true);
+  const ratio = fns.length ? Math.round((executed.length / fns.length) * 100) : 0;
+  const { source } = runtime;
+  return (
+    <>
+      <section className="gx-runtime-head">
+        <h3 className="gx-h">런타임 오버레이</h3>
+        <p className="gx-dim">
+          PR #{source.prNumber} head <code>{shortSha(source.sha)}</code> 에서 테스트를 돌리며 기록한 실제 호출
+          {source.finishedAt && ` · ${formatTime(source.finishedAt)}`}
+        </p>
+        <div className="gx-runtime-ring" style={{ ["--p" as string]: `${ratio}` }}>
+          <b>{ratio}%</b>
+          <span>함수 실행됨</span>
+        </div>
+        <div className="gx-stats">
+          <div>
+            <b>{executed.length}</b>
+            <span>실행된 함수</span>
+          </div>
+          <div>
+            <b>{runtime.testCount}</b>
+            <span>테스트</span>
+          </div>
+          <div>
+            <b style={{ color: RUNTIME_ONLY_COLOR }}>{onlyRuntime.length}</b>
+            <span>숨은 호출</span>
+          </div>
+        </div>
+      </section>
+      <section className="gx-impact-list">
+        <h4>가장 많이 불린 함수</h4>
+        <ul>
+          {hot.map((id) => {
+            const n = runtime.calls.get(id) ?? 0;
+            return (
+              <li key={id}>
+                <button onClick={() => onPickFn(id)} title={graph.getNodeAttribute(id, "file")}>
+                  {graph.getNodeAttribute(id, "label")}
+                </button>
+                <span className="gx-dim">{fileName(graph.getNodeAttribute(id, "file"))}</span>
+                <span className="gx-runtime-count" style={{ color: runtimeColor(heat(runtime, n)) }}>
+                  ×{n.toLocaleString()}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {onlyRuntime.length > 0 && (
+          <>
+            <h4 style={{ color: RUNTIME_ONLY_COLOR }}>
+              실행 중에만 보인 호출 <span className="gx-dim">인터페이스 · 상속 · 프레임워크</span>
+            </h4>
+            <ul>
+              {onlyRuntime.slice(0, LIST_PREVIEW).map((e) => (
+                <li key={e}>
+                  <button onClick={() => onPickFn(graph.source(e))}>{graph.getNodeAttribute(graph.source(e), "label")}</button>
+                  <span className="gx-dim">→</span>
+                  <button onClick={() => onPickFn(graph.target(e))}>{graph.getNodeAttribute(graph.target(e), "label")}</button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <p className="gx-hint">
+          밝을수록 많이 불린 함수, 어두운 점은 테스트가 한 번도 지나가지 않은 함수예요. 흐르는 빛은 실제로 일어난 호출 방향입니다.
+        </p>
       </section>
     </>
   );

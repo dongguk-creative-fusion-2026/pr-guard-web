@@ -18,6 +18,7 @@ export type StageId =
   | "EXEC_TEST_BASE"
   | "EXEC_TEST_HEAD"
   | "EXEC_DIFF"
+  | "EXEC_EVIDENCE"
   | "VERDICT"
   | "PUBLISH"
   | "REVIEW";
@@ -64,6 +65,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   EXEC_TEST_BASE: { label: "base 빌드 · 테스트", hint: "clone · 빌드 · 테스트", icon: "🧪" },
   EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트", icon: "🧪" },
   EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패", icon: "⚔️" },
+  EXEC_EVIDENCE: { label: "증거 테스트", hint: "바뀐 동작을 테스트로 고정", icon: "🧬" },
   VERDICT: { label: "판정", hint: "규칙으로 계산", icon: "⚖️" },
   PUBLISH: { label: "PR 코멘트", hint: "요약 · 라인", icon: "💬" },
 };
@@ -93,6 +95,8 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_TEST_BASE: { x: 4 * COL, y: 5.3 * ROW },
   EXEC_TEST_HEAD: { x: 4 * COL, y: 6.5 * ROW },
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
+  // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
+  EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },
   VERDICT: { x: 6 * COL, y: 2 * ROW },
   PUBLISH: { x: 7 * COL, y: 2 * ROW },
 };
@@ -120,6 +124,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   EXEC_TEST_BASE: { x: 1.6 * VCOL, y: 4 * VROW },
   EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
   EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
+  EXEC_EVIDENCE: { x: -VCOL, y: 3.5 * VROW },
   VERDICT: { x: 0, y: 7 * VROW },
   PUBLISH: { x: 0, y: 8 * VROW },
 };
@@ -149,6 +154,9 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["EXEC_TEST_BASE", "EXEC_DIFF"],
   ["EXEC_TEST_HEAD", "EXEC_DIFF"],
   ["EXEC_DIFF", "VERDICT"],
+  ["METHOD_DIFF", "EXEC_EVIDENCE"],
+  ["EXEC_EVIDENCE", "EXEC_TEST_BASE"],
+  ["EXEC_EVIDENCE", "EXEC_TEST_HEAD"],
   ["VERDICT", "PUBLISH"],
 ];
 
@@ -209,10 +217,17 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
     case "EXEC_TEST_BASE":
     case "EXEC_TEST_HEAD":
       return [`테스트 ${data.tests}`, `실패 ${data.failed}`];
-    case "EXEC_DIFF":
-      return data.headFailed
-        ? ["head 빌드 실패"]
-        : [`회귀 ${data.regressions?.length ?? 0}`, `새 실패 ${data.newFailures?.length ?? 0}`];
+    case "EXEC_DIFF": {
+      if (data.headFailed) return ["head 빌드 실패"];
+      const proven = (data.evidence ?? []).filter((e: { kind: string }) => e.kind === "PROVEN").length;
+      return [
+        `회귀 ${data.regressions?.length ?? 0}`,
+        `새 실패 ${data.newFailures?.length ?? 0}`,
+        ...(proven > 0 ? [`동작 변화 ${proven}`] : []),
+      ];
+    }
+    case "EXEC_EVIDENCE":
+      return [`테스트 ${data.tests?.length ?? 0}`, ...(data.generator ? [String(data.generator)] : [])];
     case "VERDICT":
       return [`B ${data.blocker} · M ${data.major} · m ${data.minor}`];
     case "PUBLISH":

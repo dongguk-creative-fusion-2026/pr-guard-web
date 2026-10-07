@@ -15,20 +15,20 @@ export default async function GraphPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ file?: string; fn?: string }>;
+  searchParams: Promise<{ file?: string; fn?: string; runtime?: string }>;
 }) {
   const id = Number((await params).id);
-  const { file, fn } = await searchParams;
+  const { file, fn, runtime: runtimeParam } = await searchParams;
   if (!Number.isInteger(id)) notFound();
 
   let data;
   try {
-    data = await Promise.all([api.getProject(id), api.getGraph(id)]);
+    data = await Promise.all([api.getProject(id), api.getGraph(id), api.getRuntime(id)]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const [project, graph] = data;
+  const [project, graph, runtime] = data;
   const title = `${project.owner}/${project.name}`;
 
   if (!graph?.graph) {
@@ -55,6 +55,8 @@ export default async function GraphPage({
       fontFamily={mono.style.fontFamily}
       initialFile={file}
       initialFunction={fn}
+      runtime={runtime}
+      initialRuntime={runtimeParam === "1"}
     />
   );
 }

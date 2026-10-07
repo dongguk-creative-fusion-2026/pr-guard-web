@@ -44,10 +44,10 @@ const VERDICT_LABEL: Record<string, string> = {
 /**
  * 리뷰 파이프라인 그래프. 진행 중이면 실시간으로, 끝난 리뷰는 다시보기로 단계가 켜지는 모습을 보여 준다.
  */
-export function PipelineView({ reviewId }: { reviewId: number }) {
+export function PipelineView({ reviewId, projectId }: { reviewId: number; projectId?: number }) {
   return (
     <ReactFlowProvider>
-      <Pipeline reviewId={reviewId} />
+      <Pipeline reviewId={reviewId} projectId={projectId} />
     </ReactFlowProvider>
   );
 }
@@ -73,7 +73,7 @@ function useContainerFit(vertical: boolean) {
   return { ref, width };
 }
 
-function Pipeline({ reviewId }: { reviewId: number }) {
+function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: number }) {
   const router = useRouter();
   const { events, ended } = usePipelineEvents(reviewId);
   const [replay, setReplay] = useState<{ cursor: number; speed: number } | null>(null);
@@ -86,6 +86,18 @@ function Pipeline({ reviewId }: { reviewId: number }) {
   useEffect(() => {
     if (width > 0) setVertical(width < VERTICAL_BELOW);
   }, [width]);
+
+  // 고른 단계를 주소(?stage=)에 남겨 그 단계 상세를 바로 공유할 수 있게 한다
+  useEffect(() => {
+    const stage = new URL(window.location.href).searchParams.get("stage");
+    if (stage && GRAPH_STAGES.includes(stage as Exclude<StageId, "REVIEW">)) setSelected(stage as Exclude<StageId, "REVIEW">);
+  }, []);
+  useEffect(() => {
+    if (!selected) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("stage", selected);
+    window.history.replaceState(null, "", url);
+  }, [selected]);
 
   // 진행 중인 리뷰를 보다가 끝나면 아래 지적 사항 영역을 새로 불러온다
   useEffect(() => {
@@ -256,7 +268,7 @@ function Pipeline({ reviewId }: { reviewId: number }) {
       </div>
       <p className="muted pipeline-hint">노드를 누르면 그 단계가 만든 결과를 볼 수 있습니다.</p>
 
-      {focus && <StageDetail stage={focus} state={states[focus]} />}
+      {focus && <StageDetail stage={focus} state={states[focus]} projectId={projectId} />}
     </section>
   );
 }
