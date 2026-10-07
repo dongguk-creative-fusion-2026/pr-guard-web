@@ -72,8 +72,13 @@ function lineClass(line: string): string {
 }
 
 /** EXEC_EVIDENCE 상세: 만든 증거 테스트 */
-export function GeneratedTests({ data }: { data: { generator?: string; targets?: string[]; tests?: GeneratedTest[] } }) {
+export function GeneratedTests({
+  data,
+}: {
+  data: { generator?: string; targets?: string[]; tests?: GeneratedTest[]; probes?: { className: string; target: string; code: string }[] };
+}) {
   const tests = data.tests ?? [];
+  const probes = data.probes ?? [];
   return (
     <>
       <p className="muted">
@@ -101,6 +106,23 @@ export function GeneratedTests({ data }: { data: { generator?: string; targets?:
             </motion.div>
           ))}
         </div>
+      )}
+      {probes.length > 0 && (
+        <>
+          <h3>관측 테스트 (동작 diff)</h3>
+          <p className="muted">판정하지 않고, 바뀐 메서드를 여러 입력으로 불러 base · head 의 결과를 기록합니다.</p>
+          <div className="ev-list">
+            {probes.map((p) => (
+              <div key={p.className} className="ev-card">
+                <div className="ev-head">
+                  <code>{simpleName(p.className)}</code>
+                  <span className="muted">→ {shortMethod(p.target)}</span>
+                </div>
+                <Code code={p.code} />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

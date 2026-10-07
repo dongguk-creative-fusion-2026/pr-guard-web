@@ -370,6 +370,11 @@ export const api = {
     call<ProjectRuntime | undefined>(`/api/projects/${id}/runtime`)
       .then((r) => r ?? null)
       .catch(() => null),
+  /** 리뷰 단계 기록 (스트림이 아니라 한 번에). 실패하면 빈 목록 */
+  getReviewEvents: (reviewId: number) =>
+    call<{ stage: string; status: string; data: Record<string, unknown> | null }[]>(`/api/reviews/${reviewId}/events`, {
+      headers: { Accept: "application/json" },
+    }).catch(() => []),
   getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
   /** 백엔드가 지원하지 않으면 빈 목록 */
   getLessons: (id: number) => call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`).catch(() => [] as Lesson[]),
