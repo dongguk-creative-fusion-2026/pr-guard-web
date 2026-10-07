@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { GraphData, InfraMap, ProjectRuntime } from "@/lib/api";
 import { fileName, formatTime, shortSha } from "@/lib/format";
+import { computeDelegation, ZONE_META, type Delegation, type FileZone, type Zone } from "@/lib/delegation";
 import { buildRuntime, fileRuntime, runtimeColor, type FileRuntime } from "../graph/runtime";
 import { cityLegend, CodeCity, type CityColorMode } from "./CodeCity";
 import { INFRA_STYLE } from "./InfraLayer";
@@ -35,6 +36,7 @@ const MODES: { key: CityColorMode; label: string }[] = [
   { key: "recent", label: "최근 변경" },
   { key: "test", label: "테스트" },
   { key: "runtime", label: "⚡ 런타임" },
+  { key: "delegation", label: "🤖 AI 위임" },
 ];
 
 const TOP = 10;
@@ -76,6 +78,7 @@ export function InsightsView({
 }: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
   const live = useMemo(() => (runtime ? fileRuntime(buildRuntime(runtime, data), data) : null), [runtime, data]);
+  const delegation = useMemo(() => computeDelegation(data, live, insights), [data, live, insights]);
   const [tab, setTab] = useState<InsightTab>(initialTab);
   const [mode, setMode] = useState<CityColorMode>(
     initialMode && (initialMode !== "runtime" || live) ? initialMode : insights.hasHistory ? "hotspot" : "group",
@@ -137,6 +140,7 @@ export function InsightsView({
               selectedInfra={selectedInfra}
               onSelectInfra={setSelectedInfra}
               runtime={live}
+              delegation={delegation}
             />
           )}
           {tab === "city" && timeline && <TimeTravel timeline={timeline} index={timeIndex} setIndex={setTimeIndex} insights={insights} />}
@@ -199,6 +203,8 @@ export function InsightsView({
               onClose={() => setSelectedInfra(null)}
             />
           ) : current ? (
+            <>
+              {tab === "city" && mode === "delegation" && <ZoneBox zone={delegation.files.get(current.path)} />}
             <FileCard
               file={current}
               insights={insights}
@@ -208,6 +214,9 @@ export function InsightsView({
               infra={showInfra ? infra : null}
               onPickInfra={setSelectedInfra}
             />
+            </>
+          ) : tab === "city" && mode === "delegation" ? (
+            <DelegationPanel delegation={delegation} onPick={pickFile} hasRuntime={live !== null} />
           ) : tab === "city" && mode === "runtime" && live ? (
             <RuntimeList runtime={live} insights={insights} onPick={pickFile} />
           ) : tab === "coupling" ? (
@@ -798,6 +807,83 @@ function RuntimeList({ runtime, insights, onPick }: { runtime: FileRuntime; insi
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** 고른 파일의 위임 구역과 이유 */
+function ZoneBox({ zone }: { zone: FileZone | undefined }) {
+  if (!zone) return null;
+  const meta = ZONE_META[zone.zone];
+  return (
+    <section className="zone-box" style={{ borderColor: meta.color }}>
+      <b style={{ color: meta.color }}>
+        <i className="zone-dot" style={{ background: meta.color }} />
+        {meta.label}
+      </b>
+      <ul>
+        {zone.reasons.map((r) => (
+          <li key={r.text} className={r.kind === "tested" || r.kind === "runtime" ? "good" : ""}>
+            {r.kind === "tested" || r.kind === "runtime" ? "✓" : "•"} {r.text}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** AI 위임 지도 요약: 구역 비율 + 사람이 직접 · 리뷰 필수 파일과 이유 */
+function DelegationPanel({ delegation, onPick, hasRuntime }: { delegation: Delegation; onPick: (path: string) => void; hasRuntime: boolean }) {
+  const total = delegation.code.length || 1;
+  const zones: Zone[] = ["OWN", "REVIEW", "DELEGATE"];
+  return (
+    <section className="deleg">
+      <h3 className="gx-h">AI 위임 지도</h3>
+      <p className="gx-dim">
+        이 레포에서 AI 에이전트에게 어디까지 맡겨도 되는지 레포 데이터(테스트 관계 · 핫스팟 · 숨은 결합 · 의존도{hasRuntime ? " · 런타임 기록" : ""})로
+        나눴어요. PR 이 빨간 구역을 건드리면 리뷰 화면에 표시돼요.
+      </p>
+      <div className="deleg-bar">
+        {zones.map((z) => (
+          <span key={z} style={{ flex: delegation.counts[z], background: ZONE_META[z].color }} title={`${ZONE_META[z].label} ${delegation.counts[z]}`} />
+        ))}
+      </div>
+      <div className="deleg-stats">
+        {zones.map((z) => (
+          <div key={z}>
+            <b style={{ color: ZONE_META[z].color }}>{Math.round((delegation.counts[z] / total) * 100)}%</b>
+            <span>{ZONE_META[z].label}</span>
+            <span className="gx-dim">{delegation.counts[z]}개 파일</span>
+          </div>
+        ))}
+      </div>
+      {(["OWN", "REVIEW"] as Zone[]).map((z) => {
+        const list = delegation.code.filter((f) => f.zone === z);
+        if (list.length === 0) return null;
+        return (
+          <div key={z} className="deleg-list">
+            <h4 style={{ color: ZONE_META[z].color }}>
+              {ZONE_META[z].label} <span className="gx-dim">{ZONE_META[z].desc}</span>
+            </h4>
+            <ul>
+              {list.slice(0, 12).map((f) => (
+                <li key={f.path}>
+                  <button onClick={() => onPick(f.path)} title={f.path}>
+                    {f.path.slice(f.path.lastIndexOf("/") + 1)}
+                  </button>
+                  <span className="gx-dim">
+                    {f.reasons
+                      .filter((r) => r.kind !== "tested" && r.kind !== "runtime")
+                      .map((r) => r.text)
+                      .join(" · ")}
+                  </span>
+                </li>
+              ))}
+              {list.length > 12 && <li className="gx-dim">외 {list.length - 12}개</li>}
+            </ul>
+          </div>
+        );
+      })}
     </section>
   );
 }

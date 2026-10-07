@@ -5,11 +5,12 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import { PCFShadowMap, type Mesh, type MeshStandardMaterial } from "three";
 import type { InfraMap } from "@/lib/api";
+import { ZONE_META, type Delegation } from "@/lib/delegation";
 import { runtimeColor, type FileRuntime } from "../graph/runtime";
 import { InfraLayer } from "./InfraLayer";
 import { heatColor, relativeDays, squarify, type FileMetric, type Insights, type TimeState } from "./metrics";
 
-export type CityColorMode = "hotspot" | "group" | "recent" | "test" | "runtime";
+export type CityColorMode = "hotspot" | "group" | "recent" | "test" | "runtime" | "delegation";
 
 /** 런타임 모드에서 호로 그릴 파일 간 호출 수 */
 const RUNTIME_ARCS = 40;
@@ -80,7 +81,7 @@ export function buildingColor(f: FileMetric, mode: CityColorMode, insights: Insi
   if (mode === "group") return f.color;
   if (mode === "recent") return recencyColor(f.history?.lastAt, insights.until);
   if (mode === "test") return f.test ? "#4ade80" : "#3b3f5c";
-  if (mode === "runtime") return DIM;
+  if (mode === "runtime" || mode === "delegation") return DIM;
   return heatColor(f.hotspot);
 }
 
@@ -245,6 +246,7 @@ export function CodeCity({
   selectedInfra = null,
   onSelectInfra,
   runtime,
+  delegation,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -258,6 +260,8 @@ export function CodeCity({
   onSelectInfra?: (id: string | null) => void;
   /** 런타임 모드: 테스트가 돌며 실제로 일어난 호출 (파일 단위) */
   runtime?: FileRuntime | null;
+  /** AI 위임 모드: 파일별 구역 */
+  delegation?: Delegation | null;
 }) {
   const live = mode === "runtime" && runtime ? runtime : null;
   const liveHeat = (n: number) => (live ? Math.log(1 + n) / Math.log(1 + live.maxCalls) : 0);
@@ -304,6 +308,21 @@ export function CodeCity({
         n > 0
           ? { color: runtimeColor(t), height: b.h, glow: 0.35 + t * 0.9, opacity: 1, visible: true, badge: 0 }
           : { color: DIM, height: b.h * 0.55, glow: 0.02, opacity: 0.4, visible: true, badge: 0 };
+    }
+    if (mode === "delegation" && delegation) {
+      const z = delegation.files.get(b.file.path);
+      if (z) {
+        // 사람이 직접 다룰 곳은 높이 솟고 강하게 빛나서 멀리서도 보인다
+        const own = z.zone === "OWN";
+        look = {
+          color: ZONE_META[z.zone].color,
+          height: b.h * (own ? 1.25 : 1) + (own ? 1.5 : 0),
+          glow: own ? 0.95 : z.zone === "REVIEW" ? 0.45 : 0.18,
+          opacity: b.file.test ? 0.35 : 1,
+          visible: true,
+          badge: 0,
+        };
+      }
     }
     if (impact) {
       const level = impact.levels.get(b.file.path);
@@ -459,6 +478,8 @@ export function CodeCity({
 }
 
 export function cityLegend(mode: CityColorMode): { label: string; stops: string[]; left: string; right: string } {
+  if (mode === "delegation")
+    return { label: "AI 위임 구역", stops: [ZONE_META.DELEGATE.color, ZONE_META.REVIEW.color, ZONE_META.OWN.color], left: "맡겨도 됨", right: "사람이 직접" };
   if (mode === "runtime") return { label: "테스트 중 불린 횟수", stops: [DIM, runtimeColor(0), runtimeColor(0.5), runtimeColor(1)], left: "안 불림", right: "많이" };
   if (mode === "recent") return { label: "마지막 변경", stops: [heatColor(0), heatColor(0.5), heatColor(1)], left: "90일+ 전", right: "최근" };
   if (mode === "test") return { label: "테스트 파일", stops: ["#3b3f5c", "#4ade80"], left: "코드", right: "테스트" };

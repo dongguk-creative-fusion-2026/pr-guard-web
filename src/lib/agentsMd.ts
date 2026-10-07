@@ -1,5 +1,6 @@
 import { computeBriefing } from "@/components/graph/briefing";
 import { computeInsights } from "@/components/insights/metrics";
+import { computeDelegation } from "./delegation";
 import type { AgentsInfo, GraphData, Lesson } from "./api";
 import { fileName } from "./format";
 
@@ -119,6 +120,30 @@ export function buildAgentsMd(repo: string, data: GraphData, info: AgentsInfo, c
     }
     push("");
     sources.push({ section: "함께 바뀌어야 하는 파일", from: "git 이력 동시 변경 통계" });
+  }
+
+  // AI 작업 구역 (위임 지도)
+  const deleg = computeDelegation(data, null, ins);
+  const own = deleg.code.filter((f) => f.zone === "OWN");
+  const review = deleg.code.filter((f) => f.zone === "REVIEW");
+  if (own.length > 0 || review.length > 0) {
+    push("## AI 작업 구역", "");
+    if (own.length > 0) {
+      push("**사람이 직접** — 에이전트는 이 파일을 고치지 않고, 바꿔야 하면 무엇을 왜 바꿀지 제안만 합니다:", "");
+      for (const f of own.slice(0, 12)) {
+        push(`- ${code(f.path)} — ${f.reasons.filter((r) => r.kind !== "tested" && r.kind !== "runtime").map((r) => r.text).join(", ")}`);
+      }
+      push("");
+    }
+    if (review.length > 0) {
+      push("**고쳐도 되지만 사람 리뷰 필수** — PR 본문에 이 파일을 바꾼 이유를 따로 적습니다:", "");
+      for (const f of review.slice(0, 12)) {
+        push(`- ${code(f.path)} — ${f.reasons.filter((r) => r.kind !== "tested" && r.kind !== "runtime").map((r) => r.text).join(", ")}`);
+      }
+      push("");
+    }
+    push("나머지 코드는 테스트가 지키는 안정적인 곳이라 에이전트가 맡아도 됩니다.", "");
+    sources.push({ section: "AI 작업 구역", from: "위임 지도 (보안 경로 · 테스트 관계 · 핫스팟 · 숨은 결합 · 의존도)" });
   }
 
   // 테스트 규칙

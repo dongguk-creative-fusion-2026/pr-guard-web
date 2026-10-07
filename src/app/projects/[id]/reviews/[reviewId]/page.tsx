@@ -11,6 +11,7 @@ import {
   VERDICT_LABEL,
 } from "@/lib/format";
 import { computeImpact, type Impact } from "@/components/graph/impact";
+import { computeDelegation, touchedZones, ZONE_META, type FileZone, type Zone } from "@/lib/delegation";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { ReviewMarkdown } from "../../ReviewMarkdown";
 
@@ -73,6 +74,10 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
           {review.summary && <p>{review.summary}</p>}
+
+          {graph?.graph && context && (
+            <ZoneCard zones={touchedZones(computeDelegation(graph.graph), (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)))} projectId={projectId} />
+          )}
 
           {graph?.graph ? (
             <ImpactCard
@@ -333,4 +338,45 @@ function dedupeBlame(blame: AnalysisContext["blame"]) {
     seen.add(key);
     return true;
   });
+}
+
+/** 이 PR 이 건드린 파일의 AI 위임 구역. 사람이 직접 다뤄야 할 곳을 건드렸으면 눈에 띄게 */
+function ZoneCard({ zones, projectId }: { zones: FileZone[]; projectId: number }) {
+  if (zones.length === 0) return null;
+  const count = (z: Zone) => zones.filter((f) => f.zone === z).length;
+  const worst = zones[0].zone;
+  return (
+    <div className={`zone-card ${worst}`}>
+      <div className="zone-card-head">
+        <b>AI 위임 구역</b>
+        {(["OWN", "REVIEW", "DELEGATE"] as Zone[]).map((z) =>
+          count(z) > 0 ? (
+            <span key={z} className="zone-chip" style={{ background: ZONE_META[z].color }}>
+              {ZONE_META[z].label} {count(z)}
+            </span>
+          ) : null,
+        )}
+        <Link href={`/projects/${projectId}/insights?tab=city&mode=delegation`}>위임 지도 →</Link>
+      </div>
+      {worst !== "DELEGATE" && (
+        <ul>
+          {zones
+            .filter((f) => f.zone !== "DELEGATE")
+            .map((f) => (
+              <li key={f.path}>
+                <i className="zone-dot" style={{ background: ZONE_META[f.zone].color }} />
+                <code>{f.path.slice(f.path.lastIndexOf("/") + 1)}</code>{" "}
+                <span className="muted">
+                  {f.reasons
+                    .filter((r) => r.kind !== "tested" && r.kind !== "runtime")
+                    .map((r) => r.text)
+                    .join(" · ")}
+                </span>
+              </li>
+            ))}
+        </ul>
+      )}
+      {worst === "OWN" && <p className="zone-warn">사람이 직접 다뤄야 할 코드를 바꾼 PR 이에요. AI 가 쓴 변경이라면 꼼꼼히 확인하세요.</p>}
+    </div>
+  );
 }

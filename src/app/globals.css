@@ -3276,3 +3276,150 @@ a.button.primary {
   gap: 2px;
   font-size: 12px;
 }
+
+/* AI 위임 지도 */
+.zone-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 0;
+}
+
+.zone-box {
+  margin: 0 0 4px;
+  padding: 10px 12px;
+  border-left: 3px solid;
+  border-radius: 6px;
+  background: #11111c;
+  font-size: 12px;
+}
+
+.zone-box ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.7;
+  color: #c8c8d8;
+}
+
+.zone-box li.good {
+  color: #86efac;
+}
+
+.deleg-bar {
+  display: flex;
+  height: 10px;
+  margin: 12px 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  gap: 2px;
+}
+
+.deleg-bar span {
+  min-width: 4px;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.deleg-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.deleg-stats div {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border: 1px solid #23233a;
+  border-radius: 8px;
+  background: #0f0f1a;
+  font-size: 11px;
+  color: #c8c8d8;
+}
+
+.deleg-stats b {
+  font-size: 20px;
+}
+
+.deleg-list h4 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+}
+
+.deleg-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deleg-list li {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0;
+  border-bottom: 1px solid #1a1a2a;
+  font-size: 12px;
+}
+
+.deleg-list button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #e4e4ed;
+  text-align: left;
+  cursor: pointer;
+}
+
+.zone-card {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #22c55e;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.zone-card.REVIEW {
+  border-left-color: #f59e0b;
+}
+
+.zone-card.OWN {
+  border-left-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 6%, var(--surface));
+}
+
+.zone-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.zone-card-head a {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.zone-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.zone-card ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.zone-warn {
+  margin: 8px 0 0;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 13px;
+}
