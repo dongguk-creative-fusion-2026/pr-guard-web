@@ -98,6 +98,23 @@ export type Finding = {
   evidence: string | null;
   fingerprint: string;
   source: "TOOL" | "LLM";
+  /** 층별 근거. 근거 확인 단계가 생기기 전 리뷰면 없다 */
+  grounding?: Grounding | null;
+};
+
+/** 분석의 층 (아래에서 위로): 코드 인덱스 → git 이력 → 실행 · 런타임 → AI 판단 */
+export type GroundLayerId = "INDEX" | "HISTORY" | "RUNTIME" | "AI";
+/** CONFIRMED = 이 층이 같은 문제를 확인, RELATED = 관련 맥락, REFUTED = 이 층의 사실과 어긋남, NONE = 정보 없음 */
+export type GroundMark = "CONFIRMED" | "RELATED" | "REFUTED" | "NONE";
+/** CONFIRMED = AI 가 아닌 층도 확인, AI_ONLY = AI 만 주장, REFUTED = 인덱스와 어긋나 판정에서 뺌 */
+export type GroundStatus = "CONFIRMED" | "AI_ONLY" | "REFUTED";
+
+export type Grounding = {
+  status: GroundStatus;
+  /** AI 지적의 종류 (MISSING_SYMBOL, MISSING_CHECK …). 결정적 검사의 지적이면 null */
+  kind: string | null;
+  symbols: string[];
+  layers: { layer: GroundLayerId; mark: GroundMark; note: string }[];
 };
 
 export type CallerView = { callerId: string; file: string; line: number };

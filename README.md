@@ -22,7 +22,7 @@ src/
       ├─ graph/page.tsx    # 코드 그래프 전체 화면 (?file= · ?fn= 로 선택, ?runtime=1 런타임 오버레이)
       ├─ insights/         # 코드 인사이트: 코드 시티(3D, 시간 여행 · 호출 호) · 핫스팟 트리맵 · 숨은 결합 (?tab= · ?file= · ?t= · ?mode=runtime)
       ├─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5)
-      └─ reviews/[reviewId]/page.tsx  (+ impact/: PR 영향 그래프, city/: 3D 영향 시티)
+      └─ reviews/[reviewId]/page.tsx  (+ impact/: PR 영향 그래프, city/: 3D 영향 시티, layers/: 근거 층)
                            # 리뷰 상세: 파이프라인 시각화(?stage= 로 단계 선택), 판정, 지적 사항, 분석 재료
    └─ api/reviews/[id]/events/route.ts
                            # 백엔드 리뷰 단계 스트림(SSE) 중계
@@ -33,6 +33,8 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    ├─ ImpactGraph.tsx      # 바뀐 메서드 ↔ 호출부 그래프 (옛 시그니처 호출 강조)
    ├─ Evidence.tsx         # 증거 테스트: 만든 테스트 코드, base → head 판정 카드, 바뀐 메서드를 지나간 테스트
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
+src/components/layers/     # 근거 층: GroundLayers(three.js, 층 · 파일 타일 · 지적 핀), GroundLayersView(배치 · 판단 패널)
+src/lib/grounding.ts       # 층 · 판단 · 상태 이름과 색, 근거 확인 전 리뷰의 대체 근거
 src/components/insights/   # 파일 지표 · 핫스팟 점수 · treemap 배치(metrics.ts), CodeCity(three.js), HotspotMap, CouplingWheel
 src/components/graph/
    ├─ GraphExplorer.tsx    # 코드 그래프 탐색 (sigma.js WebGL): 점 = 함수, 상자 = 파일. 검색 · 묶음 숨기기 · 함수/파일 선택
@@ -49,6 +51,8 @@ src/components/graph/
 실행 검증이 돈 리뷰가 있으면 **런타임 오버레이**를 켤 수 있다. 테스트 중 많이 불린 함수일수록 밝게, 한 번도 안 불린 함수는 어둡게 보이고, 실제 호출을 따라 빛이 흐른다. 정적 분석에는 없고 실행 중에만 보인 호출(인터페이스 · 상속 · 프레임워크)은 분홍 간선으로 더한다. 코드 시티에서는 색 기준 "런타임" 으로 같은 정보를 건물과 호로 보여 준다.
 
 리뷰 파이프라인의 **증거 테스트** 노드는 PR 이 바꾼 동작을 고정하는 테스트(base 에서 통과, head 에서 실패해야 함)를 보여 주고, 차등 비교 노드는 그 판정(동작 변화 증명 · 변화 없음 · 무효 · 실행 못 함)과 바뀐 메서드를 실제로 지나간 테스트를 보여 준다.
+
+**근거 층**(리뷰 상세 → "근거 층 열기")은 지적마다 어느 층이 확인했는지 3D 로 펼쳐 보여 준다. 아래에서 위로 코드 인덱스 · git 이력 · 실행 · 런타임 · AI 판단 층을 띄우고, 이 PR 이 닿는 파일을 네 층의 같은 자리에 놓는다. 지적은 핀으로 꽂혀 확인한 층(●)까지 굵게, 맥락만 있는 층(○)까지 가늘게 내려가고, 인덱스의 사실과 어긋나는 층에는 ✕ 가 놓인다. 오른쪽 목록은 "여러 층이 확인" · "AI 만 주장" · "인덱스와 어긋남(판정에서 뺌)" 으로 묶고, 지적을 누르면 층별 근거 한 줄과 GitHub 의 바뀐 줄 링크를 보여 준다. 사람은 "AI 만 주장" 묶음부터 확인하면 된다.
 
 리뷰 상세 화면은 진행 중인 리뷰면 단계가 켜지는 모습을 실시간으로 보여 주고, 끝난 리뷰는 저장된 단계 기록을 다시보기로 재생한다.
 

@@ -19,6 +19,7 @@ export type StageId =
   | "EXEC_TEST_HEAD"
   | "EXEC_DIFF"
   | "EXEC_EVIDENCE"
+  | "GROUND"
   | "VERDICT"
   | "PUBLISH"
   | "REVIEW";
@@ -66,6 +67,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트", icon: "🧪" },
   EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패", icon: "⚔️" },
   EXEC_EVIDENCE: { label: "증거 테스트", hint: "바뀐 동작을 테스트로 고정", icon: "🧬" },
+  GROUND: { label: "근거 확인", hint: "인덱스 · 이력 · 실행 · AI", icon: "🧱" },
   VERDICT: { label: "판정", hint: "규칙으로 계산", icon: "⚖️" },
   PUBLISH: { label: "PR 코멘트", hint: "요약 · 라인", icon: "💬" },
 };
@@ -97,8 +99,10 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
   // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
   EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },
-  VERDICT: { x: 6 * COL, y: 2 * ROW },
-  PUBLISH: { x: 7 * COL, y: 2 * ROW },
+  // 모든 지적이 모여 층별 근거를 맞춰 본 뒤 판정으로
+  GROUND: { x: 6 * COL, y: 2 * ROW },
+  VERDICT: { x: 7 * COL, y: 2 * ROW },
+  PUBLISH: { x: 8 * COL, y: 2 * ROW },
 };
 
 const VCOL = 210;
@@ -125,8 +129,9 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
   EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
   EXEC_EVIDENCE: { x: -VCOL, y: 3.5 * VROW },
-  VERDICT: { x: 0, y: 7 * VROW },
-  PUBLISH: { x: 0, y: 8 * VROW },
+  GROUND: { x: 0, y: 7 * VROW },
+  VERDICT: { x: 0, y: 8 * VROW },
+  PUBLISH: { x: 0, y: 9 * VROW },
 };
 
 export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] = [
@@ -141,11 +146,12 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["HISTORY", "CHECK_C"],
   ["HISTORY", "CHECK_D"],
   ["HISTORY", "LLM"],
-  ["CHECK_A", "VERDICT"],
-  ["CHECK_B", "VERDICT"],
-  ["CHECK_C", "VERDICT"],
-  ["CHECK_D", "VERDICT"],
-  ["LLM", "VERDICT"],
+  ["CHECK_A", "GROUND"],
+  ["CHECK_B", "GROUND"],
+  ["CHECK_C", "GROUND"],
+  ["CHECK_D", "GROUND"],
+  ["LLM", "GROUND"],
+  ["GROUND", "VERDICT"],
   ["CHECKOUT", "EXEC_PREPARE"],
   ["EXEC_PREPARE", "EXEC_POD_BASE"],
   ["EXEC_PREPARE", "EXEC_POD_HEAD"],
@@ -153,7 +159,7 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["EXEC_POD_HEAD", "EXEC_TEST_HEAD"],
   ["EXEC_TEST_BASE", "EXEC_DIFF"],
   ["EXEC_TEST_HEAD", "EXEC_DIFF"],
-  ["EXEC_DIFF", "VERDICT"],
+  ["EXEC_DIFF", "GROUND"],
   ["METHOD_DIFF", "EXEC_EVIDENCE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_BASE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_HEAD"],
@@ -180,6 +186,10 @@ export function reduceStates(events: ReviewEvent[]): Record<StageId, StageState>
     s.status = e.status;
     s.message = e.message;
     if (e.data) s.data = e.data;
+  }
+  // 근거 확인 단계가 생기기 전 리뷰: 끝난 리뷰인데 이 단계 기록이 없으면 건너뛴 것으로 보여 준다
+  if (states.VERDICT.status === "DONE" && states.GROUND.status === "PENDING") {
+    states.GROUND = { ...states.GROUND, status: "SKIPPED", message: "이 단계가 생기기 전 리뷰" };
   }
   return states;
 }
@@ -229,6 +239,8 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
     }
     case "EXEC_EVIDENCE":
       return [`테스트 ${data.tests?.length ?? 0}`, ...(data.generator ? [String(data.generator)] : [])];
+    case "GROUND":
+      return [`확인 ${data.confirmed}`, `AI만 ${data.aiOnly}`, ...(data.refuted ? [`뺌 ${data.refuted}`] : [])];
     case "VERDICT":
       return [`B ${data.blocker} · M ${data.major} · m ${data.minor}`];
     case "PUBLISH":
