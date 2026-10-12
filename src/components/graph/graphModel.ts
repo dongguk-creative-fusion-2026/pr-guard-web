@@ -9,6 +9,7 @@ export const GROUP_COLORS = [
   "#c084fc", "#34d399", "#f87171", "#60a5fa", "#2dd4bf", "#e879f9",
 ];
 export const UNGROUPED_COLOR = "#64748b";
+export const TEST_PATH = /(^|\/)(test|tests|__tests__|spec)\/|\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt)$|_test\.(go|py)$|(^|\/)test_[^/]+\.py$/i;
 export const EDGE_COLOR = "#2c2c42";
 /** 선택한 것이 쓰는(호출하는) 쪽 / 선택한 것을 쓰는(호출하는) 쪽 */
 export const OUT_COLOR = "#22d3ee";
@@ -94,6 +95,8 @@ export type FileBox = {
  * GitNexus 커뮤니티를 이름으로 묶는다. 같은 패키지가 여러 커뮤니티로 쪼개져 이름이 겹치는 경우가 많다.
  * 파일 수가 많은 묶음부터.
  */
+type GroupNode = { id: string; community: string | null };
+
 export function groupCommunities(data: GraphData) {
   const labelOf = new Map(data.communities.map((c) => [c.id, c.label]));
   const files = new Map<string, number>();
@@ -101,7 +104,89 @@ export function groupCommunities(data: GraphData) {
   const groups: Group[] = [...files.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([label, count], i) => ({ label, files: count, color: GROUP_COLORS[i % GROUP_COLORS.length] }));
-  return { groups, groupOf: (community: string | null) => (community && labelOf.get(community)) || null };
+  return { groups, groupOf: (n: GroupNode) => (n.community && labelOf.get(n.community)) || null };
+}
+
+/** 구조 색: 채도를 낮춘 색 (건물 · 구역 바닥) */
+const STRUCTURE_COLORS = ["#7aa2f7", "#9ece6a", "#e0af68", "#f7768e", "#bb9af7", "#7dcfff", "#ff9e64", "#73daca", "#c0caf5", "#d4a5d4", "#a9b665", "#89b4fa"];
+const MAX_DISTRICTS = 12;
+const MAX_BLOCKS = 8;
+const CODE_ROOTS = new Set(["src", "main", "java", "kotlin", "scala", "groovy", "js", "ts", "app", "lib"]);
+
+/** src 앞까지가 모듈 (멀티 모듈 · 마이크로서비스 레포). src 가 없으면 "" */
+export function moduleOf(path: string): string {
+  const parts = path.split("/");
+  const i = parts.indexOf("src");
+  return i > 0 ? parts.slice(0, i).join("/") : "";
+}
+
+/** 계층: 테스트 · 프론트엔드 · 리소스, 그 밖에는 파일이 든 패키지(디렉터리) 이름 */
+function layerOf(path: string, test: boolean): string {
+  if (test) return "테스트";
+  const dirs = path.split("/").slice(0, -1);
+  if (dirs.includes("resources") || dirs.includes("static") || dirs.includes("webapp")) {
+    return /\.(js|jsx|ts|tsx|vue|css|scss|html)$/i.test(path) ? "프론트엔드" : "리소스";
+  }
+  const leaf = dirs[dirs.length - 1];
+  return !leaf || CODE_ROOTS.has(leaf) ? "(루트)" : leaf;
+}
+
+/** 모듈 이름들의 공통 앞부분(spring-petclinic- 같은)을 떼어 짧게 */
+function trimCommonPrefix(names: string[]): Map<string, string> {
+  const real = names.filter(Boolean);
+  let prefix = real[0] ?? "";
+  for (const n of real) while (prefix && !n.startsWith(prefix)) prefix = prefix.slice(0, -1);
+  const cut = Math.max(prefix.lastIndexOf("-"), prefix.lastIndexOf("/")) + 1;
+  return new Map(names.map((n) => [n, n ? n.slice(real.length > 1 ? cut : 0) || n : "(루트)"]));
+}
+
+/** 너무 많은 묶음은 작은 것부터 "기타" 로 */
+function capGroups(counts: Map<string, number>, max: number): (label: string) => string {
+  const keep = new Set([...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, max - 1).map(([k]) => k));
+  return (label) => (counts.size <= max || keep.has(label) ? label : "기타");
+}
+
+/**
+ * 프로젝트 구조로 묶는다 (코드 시티 구역과 같은 기준). 모듈이 둘 이상이면 구역 = 모듈 · 블록 = 계층, 아니면 구역 = 계층.
+ * 테스트는 맨 뒤, 테스트 · 기타는 회색
+ */
+export function groupStructure(data: GraphData) {
+  const paths = data.nodes.map((n) => n.id);
+  const modules = [...new Set(paths.map(moduleOf))];
+  const modular = modules.filter(Boolean).length >= 2;
+  const moduleLabel = trimCommonPrefix(modules);
+  const raw = new Map(
+    paths.map((p) => {
+      const layer = layerOf(p, TEST_PATH.test(p));
+      return [p, modular ? { district: moduleLabel.get(moduleOf(p)) ?? "(루트)", block: layer } : { district: layer, block: "" }];
+    }),
+  );
+  const districtCount = new Map<string, number>();
+  for (const r of raw.values()) districtCount.set(r.district, (districtCount.get(r.district) ?? 0) + 1);
+  const capDistrict = capGroups(districtCount, MAX_DISTRICTS);
+  for (const r of raw.values()) r.district = capDistrict(r.district);
+  const blockCount = new Map<string, Map<string, number>>();
+  for (const r of raw.values()) {
+    const m = blockCount.get(r.district) ?? new Map<string, number>();
+    m.set(r.block, (m.get(r.block) ?? 0) + 1);
+    blockCount.set(r.district, m);
+  }
+  for (const r of raw.values()) r.block = capGroups(blockCount.get(r.district)!, MAX_BLOCKS)(r.block);
+  const counts = new Map<string, number>();
+  for (const r of raw.values()) counts.set(r.district, (counts.get(r.district) ?? 0) + 1);
+  const groups: Group[] = [...counts.entries()]
+    .sort((a, b) => Number(a[0] === "테스트") - Number(b[0] === "테스트") || b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, files], i) => ({
+      label,
+      files,
+      color: label === "테스트" || label === "기타" ? UNGROUPED_COLOR : STRUCTURE_COLORS[i % STRUCTURE_COLORS.length],
+    }));
+  return {
+    groups,
+    groupOf: (n: GroupNode) => raw.get(n.id)?.district ?? null,
+    blockOf: (path: string) => raw.get(path)?.block ?? "",
+    modular,
+  };
 }
 
 /** 그래프의 함수 목록. 함수가 하나도 없는 파일은 파일 자리표시 노드 하나를 넣는다 */
@@ -131,10 +216,10 @@ function hash01(s: string): number {
 }
 
 /** 파일 사이 의존 그래프를 ForceAtlas2 로 배치해 파일마다 중심점을 얻는다 */
-function filePositions(data: GraphData, groups: Group[], groupOf: (c: string | null) => string | null) {
+function filePositions(data: GraphData, groups: Group[], groupOf: (n: GroupNode) => string | null) {
   const graph = new Graph<{ x: number; y: number; size: number }, { weight: number }>({ type: "directed" });
   const index = new Map(groups.map((g, i) => [g.label, i]));
-  const groupByFile = new Map(data.nodes.map((n) => [n.id, groupOf(n.community)]));
+  const groupByFile = new Map(data.nodes.map((n) => [n.id, groupOf(n)]));
   for (const n of data.nodes) {
     const group = groupByFile.get(n.id) ?? null;
     const i = group === null ? undefined : index.get(group);
@@ -202,7 +287,7 @@ function separate(boxes: FileBox[]) {
  * 파일 위치는 파일 의존 그래프(ForceAtlas2)에서 정하고, 함수는 상자 안에 줄 번호 순서로 한 줄에 하나씩(점 + 이름) 놓는다.
  * 상자 너비는 가장 긴 함수 이름과 파일 이름에 맞춘다.
  */
-export function buildCodeGraph(data: GraphData, groups: Group[], groupOf: (c: string | null) => string | null) {
+export function buildCodeGraph(data: GraphData, groups: Group[], groupOf: (n: GroupNode) => string | null) {
   const colorOf = new Map(groups.map((g) => [g.label, g.color]));
   const functions = codeFunctions(data);
   const byFile = new Map<string, CodeFunction[]>();
@@ -216,7 +301,7 @@ export function buildCodeGraph(data: GraphData, groups: Group[], groupOf: (c: st
     const rows = placeholderOnly ? 0 : Math.ceil(list.length / cols);
     const longest = Math.max(0, ...list.filter((f) => !f.placeholder).map((f) => displayName(f).length));
     const colW = longest * CHAR + 22;
-    const group = groupOf(n.community);
+    const group = groupOf(n);
     return {
       path: n.id,
       label: fileName(n.id),

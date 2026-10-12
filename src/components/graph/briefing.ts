@@ -46,7 +46,7 @@ export function computeBriefing(data: GraphData): Briefing {
 
   const groupTop = new Map<string, { path: string; usedBy: number }>();
   for (const n of data.nodes) {
-    const g = groupOf(n.community);
+    const g = groupOf(n);
     if (!g) continue;
     const score = usedBy.get(n.id)?.size ?? 0;
     const best = groupTop.get(g);
