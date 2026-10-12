@@ -25,12 +25,13 @@ import {
 export type InsightTab = "city" | "hotspots" | "coupling";
 
 const TABS: { key: InsightTab; label: string; hint: string }[] = [
-  { key: "city", label: "코드 시티", hint: "파일 = 건물 · 높이 = 줄 수 · 구역 = 기능 묶음" },
+  { key: "city", label: "코드 시티", hint: "파일 = 건물 · 높이 = 줄 수 · 구역 = 모듈 · 계층" },
   { key: "hotspots", label: "핫스팟", hint: "자주 바뀌고 큰 파일 = 버그가 날 확률이 높은 곳" },
   { key: "coupling", label: "숨은 결합", hint: "코드 의존은 없는데 항상 같이 바뀌는 파일" },
 ];
 
 const MODES: { key: CityColorMode; label: string }[] = [
+  { key: "structure", label: "구조" },
   { key: "hotspot", label: "핫스팟" },
   { key: "group", label: "기능 묶음" },
   { key: "recent", label: "최근 변경" },
@@ -87,7 +88,7 @@ export function InsightsView({
   const delegation = useMemo(() => computeDelegation(data, live, insights), [data, live, insights]);
   const [tab, setTab] = useState<InsightTab>(initialTab);
   const [mode, setMode] = useState<CityColorMode>(
-    initialMode && (initialMode !== "runtime" || live) ? initialMode : insights.hasHistory ? "hotspot" : "group",
+    initialMode && (initialMode !== "runtime" || live) ? initialMode : "structure",
   );
   const [selected, setSelected] = useState<string | null>(initialFile && insights.byPath.has(initialFile) ? initialFile : null);
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -99,7 +100,8 @@ export function InsightsView({
   const time = useMemo(() => (timeline && timeIndex !== null ? timeline.stateAt(timeIndex) : null), [timeline, timeIndex]);
   // 인프라 층: 사용자 말고도 노드가 있을 때만 의미가 있다
   const infra = data.infra && data.infra.nodes.length > 1 ? data.infra : null;
-  const [showInfra, setShowInfra] = useState(infra !== null);
+  // 인프라 층은 도시 구조를 가리므로 켤 때만 그린다
+  const [showInfra, setShowInfra] = useState(false);
   const [selectedInfra, setSelectedInfra] = useState<string | null>(null);
   const pickFile = (path: string | null) => {
     setSelected(path);
@@ -257,6 +259,23 @@ export function InsightsView({
 
 function Legend({ mode, insights }: { mode: CityColorMode; insights: Insights }) {
   const legend = cityLegend(mode);
+  if (mode === "structure") {
+    return (
+      <ul className="gx-legend">
+        {insights.districts.map((d) => (
+          <li key={d.label}>
+            <span className="ins-row">
+              <span className="gx-dot" style={{ background: d.color }} />
+              {d.label} <span className="gx-dim">{d.files.length}</span>
+            </span>
+            {insights.modular && d.blocks.length > 1 && (
+              <span className="gx-dim ins-blocks">{d.blocks.map((b) => b.label).join(" · ")}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+  }
   if (mode === "group") {
     return (
       <ul className="gx-legend">
