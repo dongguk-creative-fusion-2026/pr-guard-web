@@ -1,38 +1,26 @@
 import { createHash } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { api, ApiError, type AnalysisContext, type Finding } from "@/lib/api";
-import {
-  CATEGORY_LABEL,
-  fileName,
-  formatTime,
-  SEVERITY_ORDER,
-  shortMethod,
-  shortSha,
-  VERDICT_LABEL,
-} from "@/lib/format";
+import { api, ApiError, type AnalysisContext, type Finding, type Verdict } from "@/lib/api";
+import { CATEGORY_LABEL, fileName, formatTime, shortMethod, shortSha, timeAgo, VERDICT_LABEL } from "@/lib/format";
 import { computeImpact, type Impact } from "@/components/graph/impact";
-import {
-  countByStatus,
-  groundingOf,
-  hasGrounding,
-  kindLabel,
-  LAYER_META,
-  LAYER_ORDER,
-  layerOf,
-  MARK_META,
-  STATUS_META,
-  STATUS_ORDER,
-} from "@/lib/grounding";
+import { groundingOf, hasGrounding, kindLabel, LAYER_META, LAYER_ORDER, layerOf, MARK_META } from "@/lib/grounding";
 import { computeDelegation, touchedZones, ZONE_META, type FileZone, type Zone } from "@/lib/delegation";
 import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { RerunButton } from "../RerunButton";
 import { ReviewMarkdown } from "../ReviewMarkdown";
 
+/** 판정 한 줄 설명: 이 PR 을 어떻게 다루면 되는지 */
+const VERDICT_LINE: Record<Verdict, string> = {
+  MERGEABLE: "사람이 깊게 보지 않아도 됩니다",
+  NEEDS_CHANGES: "아래 지적을 확인한 뒤 머지하세요",
+  NOT_RECOMMENDED: "고치기 전에는 머지하지 마세요",
+};
+
 /**
- * PR 판단 화면 (PR 이력 → PR 하나). 위에서부터 "머지해도 되나"에 답하는 순서로 놓는다:
- * 판정 → 근거가 있는 지적 → 사람이 확인할 지적(AI 만 주장) → 이 PR 이 닿는 곳(근거 층 · 영향 시티 · 영향 그래프) → 위임 구역.
+ * PR 판단 화면 (PR 이력 → PR 하나). 위에서부터 "머지해도 되나"에 답하는 순서:
+ * 판정 → 확인된 지적 → 검토할 지적(AI 만 주장) / 옆에 영향 범위 · 위임 구역.
  * 리뷰 과정 · 판정에서 뺀 지적 · 분석 재료 · PR 코멘트 원문은 접어 둔다.
  */
 export async function ReviewDecision({ projectId, reviewId }: { projectId: number; reviewId: number }) {
@@ -63,6 +51,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
   const refuted = all.filter((f) => groundingOf(f).status === "REFUTED");
   const confirmed = findings.filter((f) => groundingOf(f).status === "CONFIRMED");
   const aiOnly = findings.filter((f) => groundingOf(f).status === "AI_ONLY");
+  const count = (s: string) => findings.filter((f) => f.severity === s).length;
   const diffUrl = (f: Finding) => {
     const files = `${repoUrl}/pull/${review.prNumber}/files`;
     if (!f.file) return files;
@@ -71,34 +60,32 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
   };
 
   return (
-    <main className="wide dec">
-      <header className="dec-head">
-        <div className="dec-title">
-          <span className="dec-num">PR #{review.prNumber}</span>
-          <h1>{pull?.title ?? `PR #${review.prNumber}`}</h1>
-          <p className="muted">
-            {pull && (
-              <>
-                {pull.author} · <code>{pull.headRef}</code> → <code>{pull.baseRef}</code> ·{" "}
-              </>
-            )}
-            <code>{shortSha(review.headSha)}</code> · {review.reviewer ?? "-"} · {formatTime(review.finishedAt ?? review.createdAt)} ·{" "}
-            <a href={`${repoUrl}/pull/${review.prNumber}`} target="_blank" rel="noreferrer">
-              GitHub ↗
-            </a>
-            {review.commentUrl && (
-              <>
-                {" · "}
-                <a href={review.commentUrl} target="_blank" rel="noreferrer">
-                  PR 코멘트 ↗
-                </a>
-              </>
-            )}
-          </p>
+    <main className="dv">
+      <header className="dv-head">
+        <div className="dv-crumb">
+          <span>#{review.prNumber}</span>
+          {pull && (
+            <span className="dv-branch">
+              {pull.headRef} → {pull.baseRef}
+            </span>
+          )}
         </div>
-        <div className="dec-runs">
+        <h1>{pull?.title ?? `PR #${review.prNumber}`}</h1>
+        <div className="dv-meta">
+          {pull && <span>{pull.author}</span>}
+          <span className="mono">{shortSha(review.headSha)}</span>
+          <span title={formatTime(review.finishedAt ?? review.createdAt)}>{timeAgo(review.finishedAt ?? review.createdAt)}</span>
+          <a href={`${repoUrl}/pull/${review.prNumber}`} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+          {review.commentUrl && (
+            <a href={review.commentUrl} target="_blank" rel="noreferrer">
+              PR 코멘트
+            </a>
+          )}
+          <span className="dv-spacer" />
           {runs.length > 1 && (
-            <span className="dec-run-list" aria-label="이 PR 의 리뷰 기록">
+            <nav className="dv-runs" aria-label="리뷰 차수">
               {[...runs].reverse().map((r) => (
                 <Link
                   key={r.id}
@@ -106,11 +93,10 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                   className={r.id === review.id ? "active" : ""}
                   title={`${shortSha(r.headSha)} · ${formatTime(r.finishedAt ?? r.createdAt)}`}
                 >
-                  {r.status === "DONE" && r.verdict ? <i className={`dot ${r.verdict}`} /> : <i className="dot" />}
-                  run {r.run}
+                  {r.run}
                 </Link>
               ))}
-            </span>
+            </nav>
           )}
           {pull?.state === "open" && <RerunButton projectId={projectId} prNumber={review.prNumber} />}
         </div>
@@ -118,67 +104,58 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
 
       {review.status !== "DONE" ? (
         <>
-          <div className="dec-status">
+          <div className="dv-status">
             <span className={`badge ${review.status}`}>{review.status}</span>
-            {review.status === "PENDING" && <span className="muted">대기열에서 차례를 기다리는 중입니다.</span>}
-            {review.status === "RUNNING" && <span className="muted">분석하는 중입니다. 단계가 켜지는 모습을 아래에서 볼 수 있어요.</span>}
             {review.error && <span className="error">{review.error}</span>}
           </div>
           <PipelineView reviewId={review.id} projectId={projectId} />
         </>
       ) : (
         <>
-          <div className="dec-grid">
-            <section className="dec-main">
-              <div className="dec-verdict">
-                {review.verdict && <span className={`verdict large ${review.verdict}`}>{VERDICT_LABEL[review.verdict]}</span>}
-                <span className="muted">
-                  판정에 쓴 지적 {findings.length}건 ·{" "}
-                  {SEVERITY_ORDER.slice(0, 3)
-                    .map((s) => `${s} ${findings.filter((f) => f.severity === s).length}`)
-                    .join(" · ")}
-                  {refuted.length > 0 && ` · 인덱스와 어긋나 뺀 지적 ${refuted.length}건`}
-                </span>
-              </div>
-              {review.summary && <p className="dec-summary">{review.summary}</p>}
+          <div className="dv-grid">
+            <div className="dv-main">
+              {review.verdict && (
+                <section className={`dv-verdict ${review.verdict}`}>
+                  <div className="dv-verdict-label">
+                    <i />
+                    {VERDICT_LABEL[review.verdict]}
+                  </div>
+                  <p>{VERDICT_LINE[review.verdict]}</p>
+                  <div className="dv-counts">
+                    {(["BLOCKER", "MAJOR", "MINOR"] as const).map((s) => (
+                      <span key={s} className={count(s) > 0 ? "on" : ""}>
+                        <b>{count(s)}</b> {s}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {review.summary && <p className="dv-summary">{review.summary}</p>}
 
               {findings.length === 0 ? (
-                <div className="empty">지적 사항이 없어요. 사람이 깊게 보지 않아도 되는 PR 입니다.</div>
+                <p className="dv-empty">지적 사항 없음</p>
               ) : (
                 <>
-                  <FindingGroup
-                    title="근거가 있는 지적"
-                    color={STATUS_META.CONFIRMED.color}
-                    findings={confirmed}
-                    diffUrl={diffUrl}
-                  />
-                  <FindingGroup
-                    title="사람이 확인할 지적"
-                    color={STATUS_META.AI_ONLY.color}
-                    findings={aiOnly}
-                    diffUrl={diffUrl}
-                  />
-                  {!hasGrounding(all) && <p className="muted">근거 확인 단계가 생기기 전 리뷰라, 지적을 만든 층만 표시합니다.</p>}
+                  <FindingList title="확인된 지적" note="코드 인덱스 · 실행 검증이 같은 문제를 찾음" findings={confirmed} diffUrl={diffUrl} />
+                  <FindingList title="검토할 지적" note="AI 만 주장" findings={aiOnly} diffUrl={diffUrl} />
+                  {!hasGrounding(all) && <p className="dv-note">근거 확인 전 리뷰</p>}
                 </>
               )}
 
               <BehaviorCard rows={behaviorRows(events)} />
-            </section>
+            </div>
 
-            <aside className="dec-side">
+            <aside className="dv-side">
               {graph?.graph ? (
-                <ReachCard
-                  impact={computeImpact(graph.graph, context, findings)}
-                  findings={all}
-                  layersHref={`${base}/layers`}
-                  cityHref={`${base}/city`}
-                  impactHref={`${base}/impact`}
-                />
+                <ReachCard impact={computeImpact(graph.graph, context, findings)} layersHref={`${base}/layers`} cityHref={`${base}/city`} impactHref={`${base}/impact`} />
               ) : (
-                <div className="side-card">
-                  <b>이 PR 이 닿는 곳</b>
-                  <p className="muted">레포 분석(코드 그래프)이 끝나면 영향 범위와 근거 층을 볼 수 있어요.</p>
-                  <Link href={`${base}/layers`}>근거 층 열기 →</Link>
+                <div className="dv-card">
+                  <h3>영향 범위</h3>
+                  <p className="dv-note">레포 분석이 끝나면 보여요</p>
+                  <Link href={`${base}/layers`} className="dv-btn">
+                    근거 층
+                  </Link>
                 </div>
               )}
               {graph?.graph && context && (
@@ -190,167 +167,143 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
             </aside>
           </div>
 
-          <details className="fold">
-            <summary>리뷰 과정 · 파이프라인 다시보기</summary>
-            <PipelineView reviewId={review.id} projectId={projectId} />
-          </details>
-          {refuted.length > 0 && (
-            <details className="fold">
-              <summary>코드 인덱스와 어긋나 판정에서 뺀 AI 지적 {refuted.length}건</summary>
-              <FindingTable findings={refuted} />
+          <div className="dv-folds">
+            <details>
+              <summary>리뷰 과정</summary>
+              <PipelineView reviewId={review.id} projectId={projectId} />
             </details>
-          )}
-          {context && (
-            <details className="fold">
-              <summary>분석 재료 · 바뀐 메서드 · git 이력</summary>
-              <ContextSection context={context} />
+            {refuted.length > 0 && (
+              <details>
+                <summary>
+                  판정에서 뺀 지적 <span className="dv-n">{refuted.length}</span>
+                </summary>
+                <FindingTable findings={refuted} />
+              </details>
+            )}
+            {context && (
+              <details>
+                <summary>분석 재료</summary>
+                <ContextSection context={context} />
+              </details>
+            )}
+            <details>
+              <summary>PR 코멘트 원문</summary>
+              <div className="review-body">{review.result && <ReviewMarkdown>{review.result}</ReviewMarkdown>}</div>
             </details>
-          )}
-          <details className="fold">
-            <summary>PR 에 남긴 코멘트 원문</summary>
-            <div className="review-body">{review.result && <ReviewMarkdown>{review.result}</ReviewMarkdown>}</div>
-          </details>
+          </div>
         </>
       )}
     </main>
   );
 }
 
-/** 지적 묶음: 한 줄 요약(심각도 · 제목 · 위치 · 층 칩)을 펴면 내용, 층별 근거, GitHub 의 바뀐 줄 */
-function FindingGroup({
+/** 이 지적을 AI 말고 확인한 층 (인덱스 · 실행) */
+function confirmedBy(f: Finding): string | null {
+  const g = groundingOf(f);
+  const layers = (["INDEX", "RUNTIME"] as const).filter((id) => layerOf(g, id).mark === "CONFIRMED");
+  return layers.length ? layers.map((id) => LAYER_META[id].short).join(" · ") + " 확인" : null;
+}
+
+/** 지적 목록. 한 항목 = 두 줄(심각도 · 제목 / 위치 · 확인한 층). 누르면 내용 · 층별 근거 · 바뀐 줄 */
+function FindingList({
   title,
-  color,
+  note,
   findings,
   diffUrl,
 }: {
   title: string;
-  color: string;
+  note: string;
   findings: Finding[];
   diffUrl: (f: Finding) => string;
 }) {
   if (findings.length === 0) return null;
   return (
-    <section className="fgroup">
-      <h2 style={{ color }}>
-        {title} <span className="muted">{findings.length}</span>
+    <section className="fl">
+      <h2 className="fl-head">
+        {title} <span className="dv-n">{findings.length}</span>
+        <span className="fl-note">{note}</span>
       </h2>
-      {findings.map((f) => {
-        const g = groundingOf(f);
-        return (
-          <details key={f.id} className="fitem">
-            <summary>
-              <span className={`sev ${f.severity}`}>{f.severity}</span>
-              <span className="fitem-title">{f.title}</span>
-              <code className="fitem-loc">
-                {fileName(f.file)}
-                {f.line != null && `:${f.line}`}
-              </code>
-              <LayerChips finding={f} />
-            </summary>
-            <div className="fitem-body">
-              <p>{f.message}</p>
-              {f.evidence && <pre className="fitem-evidence">{f.evidence}</pre>}
-              <ol className="fitem-layers">
-                {[...LAYER_ORDER].reverse().map((id) => {
-                  const l = layerOf(g, id);
-                  return (
-                    <li key={id} className={l.mark}>
-                      <span style={{ color: l.mark === "REFUTED" ? "#ef4444" : LAYER_META[id].color }}>{MARK_META[l.mark].symbol}</span>
-                      <b>{LAYER_META[id].short}</b>
-                      <span>{l.note || MARK_META[l.mark].label}</span>
-                    </li>
-                  );
-                })}
-              </ol>
-              {(g.kind || g.symbols.length > 0) && (
-                <p className="muted">
-                  {kindLabel(g.kind) && <>AI 가 말한 것: {kindLabel(g.kind)} </>}
-                  {g.symbols.map((s) => (
-                    <code key={s}> {s}</code>
-                  ))}
-                </p>
-              )}
-              <a href={diffUrl(f)} target="_blank" rel="noreferrer">
-                GitHub 에서 바뀐 줄 보기 →
-              </a>
-            </div>
-          </details>
-        );
-      })}
+      <ul>
+        {findings.map((f) => {
+          const g = groundingOf(f);
+          const by = confirmedBy(f);
+          return (
+            <li key={f.id}>
+              <details>
+                <summary>
+                  <span className={`tag ${f.severity}`}>{f.severity}</span>
+                  <span className="fl-title">{f.title}</span>
+                  <span className="fl-sub">
+                    <span className="mono">
+                      {fileName(f.file)}
+                      {f.line != null && `:${f.line}`}
+                    </span>
+                    {by && <span className="fl-by">{by}</span>}
+                  </span>
+                </summary>
+                <div className="fl-body">
+                  <p>{f.message}</p>
+                  {f.evidence && <pre className="fl-evidence">{f.evidence}</pre>}
+                  <dl className="fl-layers">
+                    {[...LAYER_ORDER].reverse().map((id) => {
+                      const l = layerOf(g, id);
+                      return (
+                        <div key={id} className={l.mark}>
+                          <dt>
+                            <span className="fl-mark">{MARK_META[l.mark].symbol}</span>
+                            {LAYER_META[id].short}
+                          </dt>
+                          <dd>{l.note || MARK_META[l.mark].label}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                  {(g.kind || g.symbols.length > 0) && (
+                    <p className="fl-claim">
+                      {kindLabel(g.kind)}
+                      {g.symbols.map((s) => (
+                        <code key={s}>{s}</code>
+                      ))}
+                    </p>
+                  )}
+                  <a href={diffUrl(f)} target="_blank" rel="noreferrer" className="fl-link">
+                    바뀐 줄 보기
+                  </a>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
-const IMPACT_PREVIEW = 5;
-
-/** 이 PR 이 닿는 곳: 영향 범위 숫자와 근거 층 상태, 3D · 2D 화면으로 가는 길 */
-function ReachCard({
-  impact,
-  findings,
-  layersHref,
-  cityHref,
-  impactHref,
-}: {
-  impact: Impact;
-  findings: Finding[];
-  layersHref: string;
-  cityHref: string;
-  impactHref: string;
-}) {
-  const top = [...impact.direct, ...impact.indirect].slice(0, IMPACT_PREVIEW);
-  const byStatus = countByStatus(findings);
+/** 영향 범위: 숫자 세 개와 3D · 2D 화면으로 가는 길 */
+function ReachCard({ impact, layersHref, cityHref, impactHref }: { impact: Impact; layersHref: string; cityHref: string; impactHref: string }) {
   return (
-    <div className="graph-card reach-card">
-      <div className="graph-card-title">이 PR 이 닿는 곳</div>
-      <div className="graph-card-stats">
-        <span>
-          <b className="impact-0">{impact.changed.length}</b> 바뀐 함수
-        </span>
-        <span>
-          <b className="impact-1">{impact.direct.length}</b> 직접
-        </span>
-        <span>
-          <b className="impact-2">{impact.indirect.length}</b> 간접
-        </span>
-      </div>
-      {top.length > 0 && (
-        <div className="graph-card-groups">
-          {top.map((f) => (
-            <span key={f.id} title={f.reason ?? f.file}>
-              <i className={`impact-dot-${f.level}`} />
-              {f.name}
-              {f.stale && <em className="impact-stale">옛 시그니처 호출</em>}
-            </span>
-          ))}
-          {impact.direct.length + impact.indirect.length > IMPACT_PREVIEW && (
-            <span className="graph-card-more">+{impact.direct.length + impact.indirect.length - IMPACT_PREVIEW}</span>
-          )}
+    <div className="dv-card">
+      <h3>영향 범위</h3>
+      <div className="dv-stats">
+        <div>
+          <b>{impact.changed.length}</b>
+          <span>바뀐 함수</span>
         </div>
-      )}
-      {findings.length > 0 && (
-        <>
-          <div className="ground-bar">
-            {STATUS_ORDER.map((s) =>
-              byStatus[s] > 0 ? <i key={s} style={{ flex: byStatus[s], background: STATUS_META[s].color }} title={`${STATUS_META[s].label} ${byStatus[s]}`} /> : null,
-            )}
-          </div>
-          <p className="graph-card-note">
-            {STATUS_ORDER.filter((s) => byStatus[s] > 0)
-              .map((s) => `${STATUS_META[s].label} ${byStatus[s]}`)
-              .join(" · ")}
-          </p>
-        </>
-      )}
-      <div className="reach-actions">
-        <Link href={layersHref} className="graph-open ground-open">
-          근거 층 (3D)
-        </Link>
-        <Link href={cityHref} className="graph-more">
-          영향 시티 (3D)
-        </Link>
-        <Link href={impactHref} className="graph-more">
-          영향 그래프
-        </Link>
+        <div>
+          <b>{impact.direct.length}</b>
+          <span>직접 영향</span>
+        </div>
+        <div>
+          <b>{impact.indirect.length}</b>
+          <span>간접 영향</span>
+        </div>
+      </div>
+      <Link href={layersHref} className="dv-btn">
+        근거 층 보기
+      </Link>
+      <div className="dv-links">
+        <Link href={cityHref}>영향 시티</Link>
+        <Link href={impactHref}>영향 그래프</Link>
       </div>
     </div>
   );
@@ -566,43 +519,38 @@ function dedupeBlame(blame: AnalysisContext["blame"]) {
   });
 }
 
-/** 이 PR 이 건드린 파일의 AI 위임 구역. 사람이 직접 다뤄야 할 곳을 건드렸으면 눈에 띄게 */
+const ZONE_TONE: Record<Zone, string> = { OWN: "red", REVIEW: "yellow", DELEGATE: "green" };
+
+/** 이 PR 이 건드린 파일의 AI 위임 구역. 사람이 직접 다뤄야 할 곳을 건드렸으면 위에 */
 function ZoneCard({ zones, projectId }: { zones: FileZone[]; projectId: number }) {
   if (zones.length === 0) return null;
   const count = (z: Zone) => zones.filter((f) => f.zone === z).length;
-  const worst = zones[0].zone;
+  const risky = zones.filter((f) => f.zone !== "DELEGATE");
   return (
-    <div className={`zone-card ${worst}`}>
-      <div className="zone-card-head">
-        <b>AI 위임 구역</b>
-        {(["OWN", "REVIEW", "DELEGATE"] as Zone[]).map((z) =>
-          count(z) > 0 ? (
-            <span key={z} className="zone-chip" style={{ background: ZONE_META[z].color }}>
-              {ZONE_META[z].label} {count(z)}
-            </span>
-          ) : null,
-        )}
-        <Link href={`/projects/${projectId}/commits?tab=city&mode=delegation`}>위임 지도 →</Link>
+    <div className="dv-card">
+      <h3>
+        위임 구역
+        <Link href={`/projects/${projectId}/commits?tab=city&mode=delegation`} className="dv-h-link">
+          지도
+        </Link>
+      </h3>
+      <div className="dv-zones">
+        {(["OWN", "REVIEW", "DELEGATE"] as Zone[]).map((z) => (
+          <span key={z} className={`tag ${ZONE_TONE[z]}${count(z) === 0 ? " off" : ""}`}>
+            {ZONE_META[z].label} {count(z)}
+          </span>
+        ))}
       </div>
-      {worst !== "DELEGATE" && (
-        <ul>
-          {zones
-            .filter((f) => f.zone !== "DELEGATE")
-            .map((f) => (
-              <li key={f.path}>
-                <i className="zone-dot" style={{ background: ZONE_META[f.zone].color }} />
-                <code>{f.path.slice(f.path.lastIndexOf("/") + 1)}</code>{" "}
-                <span className="muted">
-                  {f.reasons
-                    .filter((r) => r.kind !== "tested" && r.kind !== "runtime")
-                    .map((r) => r.text)
-                    .join(" · ")}
-                </span>
-              </li>
-            ))}
+      {risky.length > 0 && (
+        <ul className="dv-zone-list">
+          {risky.map((f) => (
+            <li key={f.path}>
+              <span className={`dot-sm ${ZONE_TONE[f.zone]}`} />
+              <span className="mono">{f.path.slice(f.path.lastIndexOf("/") + 1)}</span>
+            </li>
+          ))}
         </ul>
       )}
-      {worst === "OWN" && <p className="zone-warn">사람이 직접 다뤄야 할 코드를 바꾼 PR 이에요. AI 가 쓴 변경이라면 꼼꼼히 확인하세요.</p>}
     </div>
   );
 }
@@ -621,9 +569,7 @@ function BehaviorCard({ rows }: { rows: BehaviorRow[] }) {
     <div className={`bd-card ${changed > 0 ? "changed" : ""}`}>
       <div className="bd-card-head">
         <b>동작 diff</b>
-        <span className="muted">
-          같은 입력으로 base 와 이 PR 을 실제로 실행한 결과 · {changed > 0 ? `${changed}곳에서 결과가 달라졌어요` : "결과가 모두 같아요"}
-        </span>
+        <span className="muted">{changed > 0 ? `${changed}곳에서 결과가 다름` : "결과 같음"}</span>
       </div>
       <BehaviorDiffTable rows={rows} compact />
     </div>

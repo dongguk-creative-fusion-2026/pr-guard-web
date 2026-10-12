@@ -207,7 +207,7 @@ export function GraphExplorer({
           return n > 0 ? res : { ...res, label: "" };
         }
         const hit = impact?.functions.get(node);
-        if (hit && hit.findings.length > 0) res.label = `${attrs.label} ⚠${hit.findings.length}`;
+        if (hit && hit.findings.length > 0) res.label = `${attrs.label} !${hit.findings.length}`;
         if (focus) {
           if (focus.core.has(node)) return { ...res, size: attrs.size * 1.5, zIndex: 3, forceLabel: true };
           if (focus.related.has(node)) return { ...res, zIndex: 2, forceLabel: true };
@@ -332,7 +332,7 @@ export function GraphExplorer({
         ctx.textBaseline = "middle";
         let label = box.label;
         const findings = info?.findings.length ?? 0;
-        const badge = findings > 0 ? ` ⚠${findings}` : "";
+        const badge = findings > 0 ? ` !${findings}` : "";
         const room = w - 12;
         while (label.length > 3 && ctx.measureText(label + badge).width > room) label = label.slice(0, -2);
         if (label !== box.label) label = label.slice(0, -1) + "…";
@@ -764,7 +764,7 @@ function SeverityBadge({ findings }: { findings: ImpactFunction["findings"] }) {
   if (!worst) return null;
   return (
     <span className={`gx-sev ${worst}`} title={findings.map((f) => `[${f.severity}] ${f.title}`).join("\n")}>
-      ⚠ {findings.length}
+      ! {findings.length}
     </span>
   );
 }
@@ -862,10 +862,10 @@ function FunctionDetail({
                     <li key={t}>
                       {fn && graph.hasNode(fn) ? (
                         <button className="gx-fn" onClick={() => onPickFn(fn)} title={t}>
-                          🧪 {shortTest(t)}
+                          {shortTest(t)}
                         </button>
                       ) : (
-                        <span title={t}>🧪 {shortTest(t)}</span>
+                        <span title={t}>{shortTest(t)}</span>
                       )}
                     </li>
                   );

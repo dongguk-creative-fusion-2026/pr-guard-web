@@ -40,7 +40,6 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
     >
       <Handle type="target" position={vertical ? Position.Top : Position.Left} isConnectable={false} />
       <div className="stage-head">
-        <span className="stage-icon">{meta.icon}</span>
         <span className="stage-label">{meta.label}</span>
         <span className="stage-status">
           {state.status === "RUNNING" ? (

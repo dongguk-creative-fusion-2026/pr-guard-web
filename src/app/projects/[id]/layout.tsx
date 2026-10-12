@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { Logo } from "@/components/Logo";
 import { api, ApiError } from "@/lib/api";
 import { PollButton } from "./PollButton";
 import { ProjectNav } from "./ProjectNav";
@@ -31,7 +32,7 @@ export default async function ProjectLayout({
     <div className="shell">
       <header className="pbar">
         <Link href="/" className="pbar-brand" title="프로젝트 목록">
-          🛡️
+          <Logo />
         </Link>
         <Link href={`/projects/${id}`} className="pbar-repo" title={`${project.owner}/${project.name}`}>
           {project.name}
