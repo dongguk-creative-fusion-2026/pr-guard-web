@@ -85,7 +85,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <section className="en-panel">
           <header>
             <h2>커밋 이력</h2>
-            <Link href={`/projects/${id}/commits`}>코드 시티</Link>
+            <Link href={`/projects/${id}/commits`}>커밋 그래프</Link>
           </header>
           <div className="statline compact">
             <div>
