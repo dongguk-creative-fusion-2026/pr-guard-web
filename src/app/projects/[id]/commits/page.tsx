@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const TABS: InsightTab[] = ["city", "hotspots", "coupling"];
-const MODES: CityColorMode[] = ["hotspot", "group", "recent", "test", "runtime", "delegation"];
+const MODES: CityColorMode[] = ["structure", "hotspot", "group", "recent", "test", "runtime", "delegation"];
 
 /**
  * 커밋 이력: 첫 화면은 커밋 그래프(브랜치 갈래 · 병합). ?tab=city 는 코드 시티 + 시간 여행,
