@@ -4204,7 +4204,7 @@ a.button.primary {
 
 /* 홈 */
 main.home {
-  max-width: 980px;
+  max-width: 1120px;
   padding-top: 40px;
 }
 .home-head {
@@ -4257,150 +4257,6 @@ main.home {
 .reg .error {
   margin: 6px 2px 0;
 }
-.pgrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-@media (max-width: 720px) {
-  .pgrid {
-    grid-template-columns: 1fr;
-  }
-}
-.pc {
-  --tone: hsl(var(--h, 240) 70% 62%);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 18px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--fg);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.pc:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-2);
-  text-decoration: none;
-}
-.pc-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.pc-mark {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: hsl(var(--h, 240) 18% 20%);
-  color: hsl(var(--h, 240) 60% 80%);
-  font-weight: 700;
-  font-size: 1rem;
-}
-.pc-name {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-.pc-name b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 1rem;
-  font-weight: 700;
-}
-.pc-name span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-.pc-live {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ok);
-}
-.pc-live.err {
-  background: var(--danger);
-}
-.pc-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-.pc-stats div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.pc-stats div + div {
-  padding-left: 14px;
-  border-left: 1px solid var(--border);
-}
-.pc-stats b {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-.pc-stats b.warn {
-  color: var(--warn);
-}
-.pc-stats b.ok {
-  color: var(--ok);
-}
-.pc-stats span {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.pc-bar {
-  display: flex;
-  gap: 2px;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-}
-.pc-bar i {
-  display: block;
-  background: var(--surface-2);
-}
-.pc-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-.pc-go {
-  transition: transform 0.15s ease, color 0.15s ease;
-}
-.pc:hover .pc-go {
-  transform: translateX(3px);
-  color: var(--fg);
-}
-.pc-empty {
-  align-items: center;
-  justify-content: center;
-  min-height: 170px;
-  border-style: dashed;
-  color: var(--muted);
-}
-.pc-empty:hover {
-  transform: none;
-  box-shadow: none;
-}
-
 /* 숫자 한 줄: 상자 없이 구분선으로 */
 .statline {
   display: grid;
@@ -5260,57 +5116,134 @@ main.dv {
   }
 }
 
-/* 홈 카드: 레포 구성 (언어 · 인프라) */
-.pc-stack {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: -4px;
+/* 홈: 프로젝트 목록 (열이 정렬된 표) */
+.pl {
+  border-top: 1px solid var(--border);
 }
-.pc-lang,
-.pc-part {
-  display: inline-flex;
+.pl-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(0, 2fr) 72px 72px 80px 120px 72px;
   align-items: center;
-  gap: 6px;
-  padding: 2px 9px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--fg-2);
+  gap: 20px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 14px;
+  transition: background 0.12s;
+}
+a.pl-row:hover {
+  background: var(--surface);
+  text-decoration: none;
+}
+.pl-header {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  color: var(--muted);
   font-size: 12px;
-  line-height: 1.6;
+  font-weight: 500;
+}
+.pl-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pl-row:not(.pl-header) .pl-n {
+  font-size: 15px;
+  font-weight: 600;
+}
+.pl-zero {
+  color: var(--border-strong);
+  font-weight: 400;
+}
+.pl-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pl-name b {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pc-lang i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.pc-lang em {
+.pl-name small {
+  overflow: hidden;
   color: var(--muted);
-  font-style: normal;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pc-part::before {
-  content: "";
-  width: 6px;
+.pl-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+.pl-langs,
+.pl-parts {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-langs {
+  color: var(--fg-2);
+}
+.pl-parts {
+  color: var(--muted);
+  font-size: 12px;
+}
+.pl-bar {
+  display: flex;
+  gap: 2px;
   height: 6px;
-  border-radius: 2px;
-  background: var(--muted);
+  overflow: hidden;
+  border-radius: 3px;
 }
-.pc-part.db::before {
-  background: #6fa8dc;
+.pl-bar i {
+  display: block;
 }
-.pc-part.service::before {
-  background: #a78bfa;
+.pl-bar i.empty {
+  flex: 1;
+  background: var(--surface-2);
 }
-.pc-part.platform::before {
-  background: #8fd9a6;
+.pl-row:not(.pl-header) .pl-time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
 }
-.pc-part.monitor::before {
-  background: #ecc76e;
+.pl-time.err {
+  color: var(--danger) !important;
 }
-.pc-part.external::before {
-  background: #f5a3a3;
+.pl-empty {
+  padding: 48px 0;
+  color: var(--muted);
+  text-align: center;
 }
-.pc-part.ci::before {
-  background: #8b8b95;
+@media (max-width: 860px) {
+  .pl-header {
+    display: none;
+  }
+  .pl-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 16px;
+  }
+  .pl-name {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .pl-time {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+  .pl-stack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .pl-row > .pl-n:not(.pl-time),
+  .pl-bar {
+    display: none;
+  }
+  .reg {
+    width: 100%;
+  }
 }
