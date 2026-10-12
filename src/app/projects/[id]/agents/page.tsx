@@ -38,11 +38,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ id: str
   const draft = buildAgentsMd(repo, graph.graph, info, graph.commitSha);
   return (
     <main>
-      <h1>AI 에이전트 규칙 · AGENTS.md</h1>
-      <p className="muted">
-        AI 코딩 에이전트는 레포 루트의 규칙 파일(AGENTS.md · CLAUDE.md 등)을 읽고 작업합니다. 이 파일이 없으면 에이전트는 빌드 방법 · 구조 ·
-        조심할 곳을 모른 채 코드를 씁니다. PR Guard 가 레포 분석 결과로 초안을 만들었어요.
-      </p>
+      <h1>에이전트 규칙</h1>
       <AgentsView projectId={id} repo={repo} info={info} draft={draft} lessons={lessons} />
     </main>
   );

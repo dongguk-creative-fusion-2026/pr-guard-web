@@ -75,17 +75,11 @@ export function AgentsView({
                 </a>
               ))}
             </span>
-            <span className="muted">
-              {agents ? "AGENTS.md 에 리뷰에서 반복된 실수를 규칙으로 더할 수 있어요." : "AGENTS.md 는 없어요. 다른 규칙 파일과 비교해 초안을 쓸 수 있어요."}
-            </span>
           </>
         ) : (
           <>
             <b>규칙 파일이 없어요</b>
-            <span className="muted">
-              {repo} 에는 AGENTS.md · CLAUDE.md · copilot-instructions.md · .cursorrules 가 모두 없습니다. AI 에이전트가 레포 규칙을 모른 채 작업하고
-              있어요.
-            </span>
+            <span className="muted">AGENTS.md · CLAUDE.md · copilot-instructions.md · .cursorrules</span>
           </>
         )}
       </div>
@@ -215,11 +209,8 @@ function Lessons({
   return (
     <section className="lessons">
       <h2>
-        리뷰에서 반복된 실수 <span className="muted">{repeated}개 유형이 여러 PR 에서 반복됨</span>
+        반복된 실수 <span className="muted">{repeated}</span>
       </h2>
-      <p className="muted">
-        PR Guard 리뷰 지적을 실수 유형으로 묶었어요. 고른 유형은 AGENTS.md 의 규칙이 되어, 다음부터 AI 에이전트가 같은 실수를 하지 않도록 알려 줘요.
-      </p>
       <ul className="lesson-list">
         {lessons.map((l) => (
           <li key={l.type} className={`lesson ${picked.has(l.type) ? "on" : ""} ${l.repeated ? "repeated" : ""}`}>
@@ -227,13 +218,13 @@ function Lessons({
               <input type="checkbox" checked={picked.has(l.type)} onChange={() => toggle(l.type)} />
               <span className="lesson-head">
                 <b>{l.label}</b>
-                <span className={`sev ${l.worst}`}>{l.worst}</span>
+                <span className={`tag ${l.worst}`}>{l.worst}</span>
                 <span className="muted">
                   PR {l.prs.length}개 · 지적 {l.findings}건{l.repeated ? " · 반복" : ""}
                 </span>
               </span>
             </label>
-            <p className="lesson-rule">→ {l.rule}</p>
+            <p className="lesson-rule">{l.rule}</p>
             <div className="lesson-examples">
               {l.examples.map((e) => (
                 <Link key={e.prNumber} href={`/projects/${projectId}/reviews/${e.reviewId}`} title={e.title}>

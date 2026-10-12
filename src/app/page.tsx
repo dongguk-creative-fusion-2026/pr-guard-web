@@ -2,6 +2,7 @@ import Link from "next/link";
 import { api, ApiError, type Project } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { buildQueue, LANE_META, LANES, type Lane, type QueueStats } from "@/lib/queue";
+import { Logo } from "@/components/Logo";
 import { RegisterForm } from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function Home() {
     <>
       <header className="pbar">
         <Link href="/" className="pbar-brand">
-          🛡️ PR Guard
+          <Logo /> PR Guard
         </Link>
       </header>
       <main className="home">

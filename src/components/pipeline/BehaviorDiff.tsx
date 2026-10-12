@@ -20,7 +20,7 @@ function Out({ value }: { value: string | null }) {
   const thrown = value.startsWith("throws ");
   return (
     <code className={`bd-out ${thrown ? "thrown" : value === "null" ? "null" : ""}`} title={value}>
-      {thrown ? `⚡ ${value.slice(7)}` : value}
+      {thrown ? `예외 ${value.slice(7)}` : value}
     </code>
   );
 }

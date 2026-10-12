@@ -48,7 +48,7 @@ export function StageDetail({
     >
       <div className="row">
         <strong>
-          {meta.icon} {meta.label}
+          {meta.label}
         </strong>
         <span className={`badge ${state.status}`}>{state.status}</span>
         {ms != null && <span className="muted">{ms}ms</span>}

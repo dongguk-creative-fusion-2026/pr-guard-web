@@ -164,7 +164,7 @@ function BuildingMesh({
               </span>
             </div>
           ) : (
-            <div className="city-badge">⚠ {look.badge}</div>
+            <div className="city-badge">! {look.badge}</div>
           )}
         </Html>
       )}

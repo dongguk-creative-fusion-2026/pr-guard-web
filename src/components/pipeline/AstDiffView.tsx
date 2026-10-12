@@ -92,7 +92,7 @@ export function AstDiffView({ methods }: { methods: MethodAstDiff[] }) {
               .filter((s) => s.kind !== "CONDITION_CHANGED")
               .map((s, i) => (
                 <span key={i} className={`ast-signal ${s.kind}`}>
-                  ⚠ {SIGNAL[s.kind] ?? s.kind}
+                  ! {SIGNAL[s.kind] ?? s.kind}
                 </span>
               ))}
           </button>
@@ -149,10 +149,10 @@ function MethodDiff({ m }: { m: MethodAstDiff }) {
               <div
                 key={i}
                 className={`ast-line ${top ? ACTION[top].cls : ""} ${sig ? "sig" : ""}`}
-                title={[...es.map((e) => describe(e)), ...(sig ?? []).map((s) => `⚠ ${SIGNAL[s.kind] ?? s.kind}: ${s.detail}`)].join("\n") || undefined}
+                title={[...es.map((e) => describe(e)), ...(sig ?? []).map((s) => `! ${SIGNAL[s.kind] ?? s.kind}: ${s.detail}`)].join("\n") || undefined}
               >
                 <span className="ast-ln">{line}</span>
-                <span className="ast-gutter">{sig ? "⚠" : top ? ACTION[top].label[0] : ""}</span>
+                <span className="ast-gutter">{sig ? "!" : top ? ACTION[top].label[0] : ""}</span>
                 <span className="ast-code">{text || " "}</span>
               </div>
             );
@@ -174,7 +174,7 @@ function MethodDiff({ m }: { m: MethodAstDiff }) {
             .filter((s) => s.kind !== "CONDITION_CHANGED")
             .map((s, i) => (
               <li key={i}>
-                <b>⚠ {SIGNAL[s.kind] ?? s.kind}</b> {s.detail}
+                <b>! {SIGNAL[s.kind] ?? s.kind}</b> {s.detail}
                 <span className="muted"> ({s.line > 0 ? `head ${s.line}행` : `base ${-s.line}행`})</span>
               </li>
             ))}

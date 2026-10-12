@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { fileName, formatTime, shortSha } from "@/lib/format";
-import { buildQueue, LANE_META } from "@/lib/queue";
+import { formatTime, timeAgo } from "@/lib/format";
+import { buildQueue, type Lane } from "@/lib/queue";
 import { GraphState } from "./GraphState";
 import { ProjectActions } from "./ProjectActions";
 
 export const dynamic = "force-dynamic";
 
-/** 프로젝트 입구: PR 이력과 커밋 이력 중 하나를 고른다. 갈래마다 지금 상태를 숫자로 먼저 보여 준다 */
+const PREVIEW = 5;
+const LANE_TONE: Record<Lane, string> = { BLOCKED: "red", CHECK: "yellow", PASS: "green", REVIEWING: "", NONE: "" };
+
+/** 프로젝트 입구: PR 이력 · 커밋 이력 두 갈래. 갈래마다 숫자 한 줄과 지금 볼 것 몇 개 */
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
@@ -21,58 +24,76 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     throw e;
   }
   const [project, pulls, reviews, graph] = data;
-  const { stats } = buildQueue(pulls, reviews);
+  const { items, stats } = buildQueue(pulls, reviews);
+  const attention = items.filter((i) => i.lane === "BLOCKED" || i.lane === "CHECK").slice(0, PREVIEW);
   const history = graph?.graph?.history ?? null;
-  const last = history?.timeline?.at(-1) ?? null;
-  const hot = Object.entries(history?.files ?? {})
-    .sort((a, b) => b[1].commits - a[1].commits)
-    .slice(0, 3);
+  const commits = [...(history?.timeline ?? [])].reverse().slice(0, PREVIEW);
+  const authors = history?.authors ?? [];
 
   return (
-    <main className="entry">
+    <main className="en">
       {!project.onboardedAt && (
         <Link href={`/projects/${id}/onboarding`} className="ob-banner">
-          <span>
-            <b>시작 안내를 마치지 않았어요</b> 레포 브리핑과 리뷰 설정을 확인하세요
-          </span>
-          <span>이어하기 →</span>
+          <span>시작 안내를 마치지 않았어요</span>
+          <span>이어하기</span>
         </Link>
       )}
       {project.lastPollError && <p className="error">폴링 오류: {project.lastPollError}</p>}
 
-      <div className="entry-grid">
-        <Link href={`/projects/${id}/prs`} className="entry-card pr">
-          <h2>PR 이력</h2>
-          <div className="entry-stats">
+      <div className="en-grid">
+        <section className="en-panel">
+          <header>
+            <h2>PR 이력</h2>
+            <Link href={`/projects/${id}/prs`}>대기열</Link>
+          </header>
+          <div className="statline compact">
             <div>
               <b>{stats.open}</b>
               <span>열린 PR</span>
             </div>
             <div>
-              <b style={{ color: LANE_META.CHECK.color }}>{stats.human}</b>
+              <b className="t-warn">{stats.human}</b>
               <span>볼 PR</span>
             </div>
             <div>
-              <b style={{ color: LANE_META.PASS.color }}>{stats.pass}</b>
+              <b className="t-ok">{stats.pass}</b>
               <span>자동 통과</span>
             </div>
             <div>
-              <b>{stats.medianSeconds != null ? `${stats.medianSeconds}초` : "-"}</b>
+              <b>{stats.medianSeconds != null ? `${stats.medianSeconds}s` : "-"}</b>
               <span>리뷰 시간</span>
             </div>
           </div>
-          <span className="entry-go">→</span>
-        </Link>
+          {attention.length === 0 ? (
+            <p className="en-empty">사람이 볼 PR 이 없어요</p>
+          ) : (
+            <ul className="en-list">
+              {attention.map(({ pull, review, lane }) => (
+                <li key={pull.id}>
+                  <Link href={`/projects/${id}/prs/${pull.number}`}>
+                    <i className={`dot-sm ${LANE_TONE[lane]}`} />
+                    <span className="en-num">#{pull.number}</span>
+                    <span className="en-title">{pull.title}</span>
+                    <span className="en-side">{timeAgo(review?.finishedAt ?? pull.updatedAt)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-        <Link href={`/projects/${id}/commits`} className="entry-card commit">
-          <h2>커밋 이력</h2>
-          <div className="entry-stats">
+        <section className="en-panel">
+          <header>
+            <h2>커밋 이력</h2>
+            <Link href={`/projects/${id}/commits`}>코드 시티</Link>
+          </header>
+          <div className="statline compact">
             <div>
               <b>{history?.commits ?? "-"}</b>
               <span>커밋</span>
             </div>
             <div>
-              <b>{history?.authors?.length ?? "-"}</b>
+              <b>{authors.length || "-"}</b>
               <span>작성자</span>
             </div>
             <div>
@@ -80,30 +101,38 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               <span>파일</span>
             </div>
             <div>
-              <b>{history?.until ? formatTime(history.until).slice(0, 10) : "-"}</b>
+              <b>{history?.until ? timeAgo(history.until) : "-"}</b>
               <span>마지막 커밋</span>
             </div>
           </div>
-          {last?.m && (
-            <p className="entry-last">
-              <code>{last.h ? shortSha(last.h) : ""}</code> {last.m}
-            </p>
+          {commits.length === 0 ? (
+            <p className="en-empty">레포 분석이 끝나면 커밋이 보여요</p>
+          ) : (
+            <ul className="en-list">
+              {commits.map((c, i) => (
+                <li key={i}>
+                  <Link href={`/projects/${id}/commits`}>
+                    <span className="en-num mono">{c.h ? c.h.slice(0, 7) : "-------"}</span>
+                    <span className="en-title">{c.m || `${c.c.length}개 파일 변경`}</span>
+                    <span className="en-side" title={formatTime(new Date(c.at * 1000).toISOString())}>
+                      {authors[c.a] ?? ""}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-          {hot.length > 0 && (
-            <p className="entry-hot muted">{hot.map(([path, h]) => `${fileName(path)} ${h.commits}`).join(" · ")}</p>
-          )}
-          <span className="entry-go">→</span>
-        </Link>
+        </section>
       </div>
 
-      <section className="entry-foot">
+      <footer className="entry-foot">
         <GraphState projectId={id} graph={graph} />
         <a href={project.htmlUrl} target="_blank" rel="noreferrer">
-          GitHub ↗
+          GitHub
         </a>
         <Link href={`/projects/${id}/onboarding?step=3`}>레포 브리핑</Link>
         <ProjectActions projectId={id} />
-      </section>
+      </footer>
     </main>
   );
 }

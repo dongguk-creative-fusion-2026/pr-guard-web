@@ -147,7 +147,7 @@ export function ImpactCityView({ data, context, findings, title, subtitle, backH
                           <button onClick={() => setSelected(f.path)} title={f.path}>
                             {f.name}
                           </button>
-                          {worst && <span className={`gx-sev ${worst}`}>⚠ {f.findings.length}</span>}
+                          {worst && <span className={`gx-sev ${worst}`}>! {f.findings.length}</span>}
                           {i > 0 && f.reason && <span className="gx-reason">{f.reason}</span>}
                         </li>
                       );

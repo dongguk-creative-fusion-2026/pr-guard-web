@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
+import { JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+
+// 한글 본문은 Noto Sans KR, 코드 · 해시 · 경로는 JetBrains Mono
+const sans = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "PR Guard",
@@ -10,7 +15,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body className={`${sans.variable} ${mono.variable}`}>{children}</body>
     </html>
   );
 }

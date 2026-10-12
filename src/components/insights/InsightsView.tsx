@@ -35,8 +35,8 @@ const MODES: { key: CityColorMode; label: string }[] = [
   { key: "group", label: "기능 묶음" },
   { key: "recent", label: "최근 변경" },
   { key: "test", label: "테스트" },
-  { key: "runtime", label: "⚡ 런타임" },
-  { key: "delegation", label: "🤖 AI 위임" },
+  { key: "runtime", label: "런타임" },
+  { key: "delegation", label: "AI 위임" },
 ];
 
 const TOP = 10;
