@@ -16,44 +16,38 @@ export default async function Home() {
 
   return (
     <>
-      <h1>프로젝트 등록</h1>
-      <p className="muted">public GitHub 레포 주소를 등록하면 열린 PR 을 주기적으로 확인해서 리뷰를 남깁니다.</p>
-      <RegisterForm />
+      <header className="pbar">
+        <Link href="/" className="pbar-brand">
+          🛡️ PR Guard
+        </Link>
+      </header>
+      <main>
+        <section className="home-hero">
+          <h1>AI 가 쓴 PR, 증명된 위험만 사람에게</h1>
+          <p className="muted">
+            public GitHub 레포를 등록하면 열린 PR 을 주기적으로 확인해 코드 인덱스 · git 이력 · 실행 · AI 판단으로 리뷰하고, 레포가 어떻게 변해
+            왔는지 코드 시티로 보여 줍니다.
+          </p>
+          <RegisterForm />
+        </section>
 
-      <h2>프로젝트</h2>
-      {error && <p className="error">{error}</p>}
-      {!error && projects.length === 0 && <div className="empty">등록된 프로젝트가 없습니다</div>}
-      {projects.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>레포</th>
-                <th>열린 PR</th>
-                <th>마지막 확인</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.id}</td>
-                  <td>
-                    <Link href={`/projects/${p.id}`}>
-                      {p.owner}/{p.name}
-                    </Link>
-                  </td>
-                  <td>{p.openPullCount}</td>
-                  <td>
-                    {formatTime(p.lastPolledAt)}
-                    {p.lastPollError && <div className="error">{p.lastPollError}</div>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <h2>프로젝트</h2>
+        {error && <p className="error">{error}</p>}
+        {!error && projects.length === 0 && <div className="empty">등록된 프로젝트가 없습니다</div>}
+        <div className="home-projects">
+          {projects.map((p) => (
+            <Link key={p.id} href={`/projects/${p.id}`} className="home-project">
+              <b>
+                {p.owner}/<span>{p.name}</span>
+              </b>
+              <span className="muted">
+                열린 PR {p.openPullCount} · 마지막 확인 {formatTime(p.lastPolledAt)}
+              </span>
+              {p.lastPollError && <span className="error">{p.lastPollError}</span>}
+            </Link>
+          ))}
         </div>
-      )}
+      </main>
     </>
   );
 }

@@ -37,7 +37,7 @@ export default async function ImpactPage({
   if (!graph?.graph) {
     return (
       <div className="empty">
-        레포 의존성 그래프가 아직 없습니다. <Link href={`/projects/${projectId}`}>프로젝트에서 만들기</Link>
+        레포 의존성 그래프가 아직 없습니다. <Link href={`/projects/${projectId}`}>프로젝트 입구에서 다시 분석</Link>
       </div>
     );
   }

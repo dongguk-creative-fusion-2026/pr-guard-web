@@ -32,5 +32,9 @@ export default async function OnboardingPage({
   } catch {
     repo = null;
   }
-  return <Onboarding project={project} graph={graph} repo={repo} pulls={pulls} reviews={reviews} initialStep={step} />;
+  return (
+    <main>
+      <Onboarding project={project} graph={graph} repo={repo} pulls={pulls} reviews={reviews} initialStep={step} />
+    </main>
+  );
 }

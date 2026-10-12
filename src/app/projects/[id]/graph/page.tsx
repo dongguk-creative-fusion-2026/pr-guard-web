@@ -34,7 +34,7 @@ export default async function GraphPage({
   if (!graph?.graph) {
     return (
       <div className="empty">
-        아직 그래프가 없습니다. <Link href={`/projects/${id}`}>프로젝트로 돌아가기</Link>
+        아직 그래프가 없습니다. <Link href={`/projects/${id}`}>프로젝트 입구에서 다시 분석</Link>
       </div>
     );
   }
@@ -51,7 +51,7 @@ export default async function GraphPage({
       data={graph.graph}
       title={title}
       subtitle={subtitle}
-      backHref={`/projects/${id}`}
+      backHref={`/projects/${id}/commits`}
       fontFamily={mono.style.fontFamily}
       initialFile={file}
       initialFunction={fn}

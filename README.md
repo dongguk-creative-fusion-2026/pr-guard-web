@@ -2,7 +2,14 @@
 
 PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사람이 빠르게 판단할 수 있도록, **근거와 영향 범위를 한눈에** 보여 준다.
 
-public GitHub 레포 등록 · 온보딩, 리뷰 파이프라인(실행 검증 · 증거 테스트 포함), PR 영향 그래프, 코드 그래프와 코드 인사이트(런타임 오버레이 포함)를 제공한다.
+프로젝트에 들어가면 두 갈래 중 하나를 고른다.
+
+| 갈래 | 묻는 것 | 화면 |
+|---|---|---|
+| **PR 이력** | 이 PR 머지해도 되나? | 대기열(차단 · 확인 필요 · 자동 통과, 병목 숫자) → PR 판단 화면(판정 · 근거가 있는 지적 · 사람이 확인할 지적 · 이 PR 이 닿는 곳 · 위임 구역) → 근거 층 · 영향 시티 · 영향 그래프 |
+| **커밋 이력** | 레포는 어떻게 변해 왔고, 어디가 위험한가? | 코드 시티 + 커밋 목록(시간 여행) · 핫스팟 · 숨은 결합 · 코드 그래프 · 에이전트 규칙(AGENTS.md) |
+
+모든 프로젝트 화면은 같은 상단 바(레포 · PR 이력 | 커밋 이력 · 하위 탭 · 지금 확인 · 설정) 아래에 있고, 3D · 그래프 전체 화면도 그 바 아래에 열린다. 테마는 어두운 톤 하나다.
 
 - 백엔드: [pr-guard-api](https://github.com/dongguk-creative-fusion-2026/pr-guard-api)
 
@@ -13,17 +20,23 @@ src/
 ├─ lib/api.ts              # 백엔드 호출 (서버 전용). 타입 정의 포함
 ├─ lib/format.ts
 └─ app/
-   ├─ page.tsx             # 레포 등록 + 프로젝트 목록
+   ├─ page.tsx             # 홈: 레포 등록 + 프로젝트 목록
    ├─ RegisterForm.tsx
    ├─ actions.ts           # Server Actions: 등록, 지금 확인, 다시 리뷰, 그래프 다시 만들기, 삭제
    └─ projects/[id]/
-      ├─ page.tsx          # 의존성 그래프, PR 목록(최근 판정, 다시 리뷰), 리뷰 기록
-      ├─ GraphSection.tsx  # 의존성 그래프 카드 (상태 · 수치 · 그래프 열기 · 다시 만들기). 만드는 중이면 새로고침
-      ├─ graph/page.tsx    # 코드 그래프 전체 화면 (?file= · ?fn= 로 선택, ?runtime=1 런타임 오버레이)
-      ├─ insights/         # 코드 인사이트: 코드 시티(3D, 시간 여행 · 호출 호) · 핫스팟 트리맵 · 숨은 결합 (?tab= · ?file= · ?t= · ?mode=runtime)
-      ├─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5)
-      └─ reviews/[reviewId]/page.tsx  (+ impact/: PR 영향 그래프, city/: 3D 영향 시티, layers/: 근거 층)
-                           # 리뷰 상세: 파이프라인 시각화(?stage= 로 단계 선택), 판정, 지적 사항, 분석 재료
+      ├─ layout.tsx        # 앱 틀: 상단 바 (ProjectNav: PR 이력 | 커밋 이력 + 하위 탭, PollButton: 지금 확인)
+      ├─ page.tsx          # 입구: 두 갈래 카드와 지금 숫자, 레포 분석 상태(GraphState), 프로젝트 삭제
+      ├─ prs/page.tsx      # PR 이력 · 대기열: 병목 숫자, 차단 · 확인 필요 · 자동 통과 칸, 리뷰 기록
+      ├─ prs/[number]/     # PR 하나 = 가장 최근(또는 ?review=) 리뷰의 판단 화면
+      ├─ reviews/ReviewDecision.tsx
+      │                    # 판단 화면: 판정 → 근거가 있는 지적 → 사람이 확인할 지적 → 이 PR 이 닿는 곳 · 위임 구역,
+      │                    # 리뷰 과정(파이프라인) · 판정에서 뺀 지적 · 분석 재료 · PR 코멘트는 접어 둠
+      ├─ reviews/[reviewId]/page.tsx  (+ impact/: PR 영향 그래프, city/: 3D 영향 시티, layers/: 근거 층)
+      ├─ commits/page.tsx  # 커밋 이력: 코드 시티 + 커밋 목록(시간 여행) · 핫스팟 · 숨은 결합 (?tab= · ?file= · ?t= · ?mode=)
+      ├─ insights/         # 예전 주소 → commits 로 넘김
+      ├─ graph/page.tsx    # 커밋 이력 · 코드 그래프 (?file= · ?fn= 로 선택, ?runtime=1 런타임 오버레이)
+      ├─ agents/           # 커밋 이력 · 에이전트 규칙(AGENTS.md): 반복된 실수 → 규칙 제안, 초안을 PR 로
+      └─ onboarding/       # 등록 직후: 레포 확인 → 분석 진행 → 레포 브리핑 → 리뷰 설정 → 첫 리뷰 (?step=1~5, 설정은 4)
    └─ api/reviews/[id]/events/route.ts
                            # 백엔드 리뷰 단계 스트림(SSE) 중계
 src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + motion)
@@ -35,6 +48,7 @@ src/components/pipeline/   # 리뷰 파이프라인 그래프 (React Flow + moti
    └─ stages.ts            # 단계 정의·배치·이벤트 → 상태 계산
 src/components/layers/     # 근거 층: GroundLayers(three.js, 층 · 파일 타일 · 지적 핀), GroundLayersView(배치 · 판단 패널)
 src/lib/grounding.ts       # 층 · 판단 · 상태 이름과 색, 근거 확인 전 리뷰의 대체 근거
+src/lib/queue.ts           # PR 대기열: 최근 리뷰로 칸(차단 · 확인 필요 · 자동 통과 · 리뷰 중 · 없음) 나누기, 병목 숫자
 src/components/insights/   # 파일 지표 · 핫스팟 점수 · treemap 배치(metrics.ts), CodeCity(three.js), HotspotMap, CouplingWheel
 src/components/graph/
    ├─ GraphExplorer.tsx    # 코드 그래프 탐색 (sigma.js WebGL): 점 = 함수, 상자 = 파일. 검색 · 묶음 숨기기 · 함수/파일 선택
@@ -44,7 +58,7 @@ src/components/graph/
    └─ runtime.ts           # 런타임 호출 기록 → 그래프 함수 매칭, 불린 횟수 색, 파일 단위 합계(코드 시티)
 ```
 
-프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 프로젝트 화면에는 카드만 두고, "그래프 열기"를 누르면 전체 화면에서 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.
+프로젝트를 등록하면 백엔드가 GitNexus 로 기본 브랜치를 인덱싱해 파일 의존성 그래프를 만든다. 커밋 이력 → "코드 그래프" 탭은 같은 기능 묶음(GitNexus 커뮤니티)끼리 모아 보여 주고, 파일을 누르면 그 파일이 쓰는 파일과 그 파일을 쓰는 파일을 관계 종류(import · 호출 · 주입 · 상속 …)와 함께 보여 준다.
 
 리뷰 상세의 "영향 그래프"는 같은 그래프 위에 그 PR 이 바꾼 파일(노랑)에서 그 파일을 쓰는 파일(직접, 빨강), 그 파일을 쓰는 파일(간접, 주황)로 영향이 퍼지는 모습을 보여 준다. 분석기가 확인한 호출부와 옛 시그니처로 부르는 곳, 지적 사항이 있는 파일을 함께 표시한다.
 
