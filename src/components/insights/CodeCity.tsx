@@ -293,6 +293,9 @@ export function CodeCity({
   runtime,
   delegation,
   embedded = false,
+  marks,
+  onHover,
+  shift = 0,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -310,12 +313,17 @@ export function CodeCity({
   delegation?: Delegation | null;
   /** 페이지 안에 작게 넣을 때: 휠로 확대하지 않는다 (페이지 스크롤을 뺏지 않게) */
   embedded?: boolean;
+  /** 입구 화면: 사람이 볼 PR 이 건드린 파일. 표시된 건물만 그 색으로 솟고 나머지는 구조 색을 낮게 깐다 */
+  marks?: Map<string, { color: string; badge: number }> | null;
+  onHover?: (path: string | null) => void;
+  /** 오른쪽에 패널이 덮을 때 도시를 왼쪽으로 옮기는 정도 (도시 크기 비율) */
+  shift?: number;
 }) {
   const live = mode === "runtime" && runtime ? runtime : null;
   const liveHeat = (n: number) => (live ? Math.log(1 + n) / Math.log(1 + live.maxCalls) : 0);
   const { size, districts, buildings, byPath } = useMemo(() => layoutCity(insights), [insights]);
   const roofs = useMemo(() => new Map(buildings.map((b) => [b.file.path, { x: b.x, z: b.z, top: GROUND + b.h }])), [buildings]);
-  const [, setHovered] = useState<string | null>(null);
+  const setHovered = (path: string | null) => onHover?.(path);
   const [rotate, setRotate] = useState(true);
   const labelEls = useRef(new Map<string, HTMLDivElement>());
   const labels = useMemo<CityLabel[]>(
@@ -383,6 +391,12 @@ export function CodeCity({
           badge: 0,
         };
       }
+    }
+    if (marks) {
+      const m = marks.get(b.file.path);
+      look = m
+        ? { color: m.color, height: b.h * 1.3 + 2, glow: 1, opacity: 1, visible: true, badge: m.badge }
+        : { ...look, glow: 0.04, opacity: 0.55 };
     }
     if (impact) {
       const level = impact.levels.get(b.file.path);
@@ -529,7 +543,7 @@ export function CodeCity({
         <OrbitControls
           makeDefault
           // 인프라 층(앞 · 왼쪽 입구)까지 화면 가운데에 오게 중심을 옮긴다
-          target={infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [0, 0, 0]}
+          target={infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [size * shift, 0, 0]}
           enableDamping
           enableZoom={!embedded}
           autoRotate={rotate}
