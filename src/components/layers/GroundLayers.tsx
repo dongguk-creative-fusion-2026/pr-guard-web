@@ -1,9 +1,9 @@
 "use client";
 
 import { Edges, Html, OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useRef, useState, type MutableRefObject } from "react";
-import type { Group, Mesh } from "three";
+import { Vector3, type Group, type Mesh } from "three";
 import type { GroundLayerId, GroundMark, GroundStatus, Severity } from "@/lib/api";
 import { LAYER_META, LAYER_ORDER } from "@/lib/grounding";
 
@@ -56,14 +56,34 @@ function Animator({ gap, target }: { gap: GapRef; target: number }) {
 
 const layerY = (index: number, gap: number) => index * gap;
 
+/**
+ * 층 이름표는 캔버스 위의 일반 DOM 으로 그리고, 매 프레임 각 층의 뒤쪽 왼쪽 모서리를 화면 좌표로 옮겨 붙인다.
+ * (drei Html 을 층마다 쓰면 React 19 에서 가장 먼저 만든 이름표가 사라지는 일이 있다)
+ */
+function LabelProjector({ labels, size, gap }: { labels: MutableRefObject<(HTMLDivElement | null)[]>; size: number; gap: GapRef }) {
+  const { camera, size: view } = useThree();
+  const v = useRef(new Vector3());
+  useFrame(() => {
+    const span = size + 6;
+    LAYER_ORDER.forEach((_, i) => {
+      const el = labels.current[i];
+      if (!el) return;
+      v.current.set(-span / 2, layerY(i, gap.current) + SLAB_Y, -span / 2).project(camera);
+      const x = ((v.current.x + 1) / 2) * view.width;
+      const y = ((1 - v.current.y) / 2) * view.height;
+      el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-8px, -50%)`;
+      el.style.visibility = v.current.z < 1 ? "visible" : "hidden";
+    });
+  });
+  return null;
+}
+
 function Slab({
   id,
   index,
   size,
   gap,
   tiles,
-  note,
-  count,
   focus,
 }: {
   id: GroundLayerId;
@@ -71,8 +91,6 @@ function Slab({
   size: number;
   gap: GapRef;
   tiles: LayerTile[];
-  note: string | null;
-  count: number;
   focus: Set<string> | null;
 }) {
   const group = useRef<Group>(null);
@@ -105,14 +123,6 @@ function Slab({
           </mesh>
         );
       })}
-      <Html position={[-span / 2, SLAB_Y, span / 2]} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-        <div className="gl-slab-label" style={{ borderColor: meta.color }}>
-          <b style={{ color: meta.color }}>
-            {index + 1}. {meta.label}
-          </b>
-          <span>{count > 0 ? `확인한 지적 ${count}` : (note ?? meta.hint)}</span>
-        </div>
-      </Html>
     </group>
   );
 }
@@ -266,6 +276,7 @@ export function GroundLayers({
   exploded: boolean;
 }) {
   const gap = useRef(0.6);
+  const labels = useRef<(HTMLDivElement | null)[]>([]);
   const focusPin = pins.find((p) => p.id === selected) ?? null;
   const focus = focusPin ? new Set(tiles.filter((t) => Math.hypot(t.x - focusPin.x, t.z - focusPin.z) < Math.max(t.w, t.d)).map((t) => t.path)) : null;
   const height = LAYER_GAP * (LAYER_ORDER.length - 1);
@@ -279,24 +290,35 @@ export function GroundLayers({
     (dir[2] / len) * reach,
   ];
   return (
-    <Canvas
-      dpr={[1, 2]}
-      camera={{ position: camera, fov: 40, near: 0.5, far: reach * 6 }}
-      onPointerMissed={() => onSelect(null)}
-    >
-      <color attach="background" args={["#07070d"]} />
-      <fog attach="fog" args={["#07070d", size * 2.2, size * 5]} />
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={["#a5b4fc", "#0b0b14", 0.5]} />
-      <directionalLight position={[size, size * 2, size * 0.6]} intensity={1.1} />
-      <Animator gap={gap} target={exploded ? LAYER_GAP : 0.6} />
+    <div className="gl-canvas">
+      <Canvas
+        dpr={[1, 2]}
+        camera={{ position: camera, fov: 40, near: 0.5, far: reach * 6 }}
+        onPointerMissed={() => onSelect(null)}
+      >
+        <color attach="background" args={["#07070d"]} />
+        <fog attach="fog" args={["#07070d", size * 2.2, size * 5]} />
+        <ambientLight intensity={0.55} />
+        <hemisphereLight args={["#a5b4fc", "#0b0b14", 0.5]} />
+        <directionalLight position={[size, size * 2, size * 0.6]} intensity={1.1} />
+        <Animator gap={gap} target={exploded ? LAYER_GAP : 0.6} />
+        {LAYER_ORDER.map((id, i) => (
+          <Slab key={id} id={id} index={i} size={size} gap={gap} tiles={tiles} focus={focus} />
+        ))}
+        <LabelProjector labels={labels} size={size} gap={gap} />
+        {pins.map((p) => (
+          <Pin key={p.id} pin={p} gap={gap} selected={selected === p.id} dimmed={selected != null && selected !== p.id} onSelect={onSelect} />
+        ))}
+        <OrbitControls makeDefault enableDamping target={[0, height * 0.45, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={size * 0.4} maxDistance={size * 4} />
+      </Canvas>
       {LAYER_ORDER.map((id, i) => (
-        <Slab key={id} id={id} index={i} size={size} gap={gap} tiles={tiles} note={notes[id] ?? null} count={counts[id]} focus={focus} />
+        <div key={id} ref={(el) => void (labels.current[i] = el)} className="gl-slab-label" style={{ borderColor: LAYER_META[id].color }}>
+          <b style={{ color: LAYER_META[id].color }}>
+            {i + 1}. {LAYER_META[id].label}
+          </b>
+          <span>{counts[id] > 0 ? `확인한 지적 ${counts[id]}` : (notes[id] ?? LAYER_META[id].hint)}</span>
+        </div>
       ))}
-      {pins.map((p) => (
-        <Pin key={p.id} pin={p} gap={gap} selected={selected === p.id} dimmed={selected != null && selected !== p.id} onSelect={onSelect} />
-      ))}
-      <OrbitControls makeDefault enableDamping target={[0, height * 0.45, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={size * 0.4} maxDistance={size * 4} />
-    </Canvas>
+    </div>
   );
 }
