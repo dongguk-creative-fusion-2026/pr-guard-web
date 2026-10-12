@@ -10,6 +10,7 @@ import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/Behav
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { RerunButton } from "../RerunButton";
 import { ReviewMarkdown } from "../ReviewMarkdown";
+import { ImpactCityInlineClient } from "./ImpactCityInlineClient";
 
 /** 판정 한 줄 설명: 이 PR 을 어떻게 다루면 되는지 */
 const VERDICT_LINE: Record<Verdict, string> = {
@@ -132,6 +133,8 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
               )}
 
               {review.summary && <p className="dv-summary">{review.summary}</p>}
+
+              {graph?.graph && <ImpactCityInlineClient data={graph.graph} context={context} findings={findings} href={`${base}/city`} />}
 
               {findings.length === 0 ? (
                 <p className="dv-empty">지적 사항 없음</p>
