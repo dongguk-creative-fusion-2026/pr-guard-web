@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,17 +6,11 @@ export const metadata: Metadata = {
   description: "AI 생성 코드 PR 리뷰 플랫폼",
 };
 
+/** 상단 바는 화면마다 다르다: 홈은 브랜드만, 프로젝트 안은 PR 이력 · 커밋 이력 전환 (projects/[id]/layout.tsx) */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body>
-        <header className="top">
-          <Link href="/" className="brand">
-            🛡️ PR Guard
-          </Link>
-        </header>
-        <main>{children}</main>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

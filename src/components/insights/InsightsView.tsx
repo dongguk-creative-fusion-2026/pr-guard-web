@@ -59,6 +59,10 @@ type Props = {
   runtime?: ProjectRuntime | null;
   /** 처음 색 기준 (?mode=) */
   initialMode?: CityColorMode;
+  /** false 면 위쪽 바(뒤로 · 탭)를 그리지 않는다. 프로젝트 상단 바의 커밋 이력 탭이 대신한다 */
+  chrome?: boolean;
+  /** 커밋을 GitHub 에서 열 때 쓰는 레포 주소 */
+  repoUrl?: string | null;
 };
 
 /** 코드 인사이트: 코드 시티 · 핫스팟 · 숨은 결합 */
@@ -75,6 +79,8 @@ export function InsightsView({
   sourceBase,
   runtime,
   initialMode,
+  chrome = true,
+  repoUrl = null,
 }: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
   const live = useMemo(() => (runtime ? fileRuntime(buildRuntime(runtime, data), data) : null), [runtime, data]);
@@ -112,19 +118,21 @@ export function InsightsView({
 
   return (
     <div className="gx ins" style={{ background: "#07070d", fontFamily }}>
-      <header className="gx-top">
-        <Link href={backHref} className="gx-back">
-          ← {title}
-        </Link>
-        <span className="gx-sub">{subtitle}</span>
-        <nav className="ins-tabs">
-          {TABS.map((t) => (
-            <button key={t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </header>
+      {chrome && (
+        <header className="gx-top">
+          <Link href={backHref} className="gx-back">
+            ← {title}
+          </Link>
+          <span className="gx-sub">{subtitle}</span>
+          <nav className="ins-tabs">
+            {TABS.map((t) => (
+              <button key={t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </header>
+      )}
 
       <div className="gx-body">
         <div className="ins-stage">
@@ -153,7 +161,7 @@ export function InsightsView({
         <aside className="gx-panel">
           {!insights.hasHistory && (
             <section>
-              <p className="gx-warn">git 이력이 없는 예전 그래프예요. 프로젝트 화면에서 &quot;다시 만들기&quot;를 누르면 핫스팟과 숨은 결합이 채워져요.</p>
+              <p className="gx-warn">git 이력이 없는 예전 그래프예요. 프로젝트 입구에서 &quot;다시 분석&quot;을 누르면 핫스팟과 숨은 결합이 채워져요.</p>
             </section>
           )}
           {insights.hasHistory && (
@@ -162,6 +170,55 @@ export function InsightsView({
             </section>
           )}
 
+          {tab === "city" && showInfra && infra && selectedInfra ? (
+            <InfraCard
+              infra={infra}
+              id={selectedInfra}
+              insights={insights}
+              sourceBase={sourceBase ?? null}
+              onPickFile={pickFile}
+              onPickNode={setSelectedInfra}
+              onClose={() => setSelectedInfra(null)}
+            />
+          ) : current ? (
+            <>
+              {tab === "city" && mode === "delegation" && <ZoneBox zone={delegation.files.get(current.path)} />}
+            <FileCard
+              file={current}
+              insights={insights}
+              graphHref={graphHref}
+              onPick={pickFile}
+              onClose={() => setSelected(null)}
+              infra={showInfra ? infra : null}
+              onPickInfra={setSelectedInfra}
+            />
+            </>
+          ) : tab === "city" && mode === "delegation" ? (
+            <DelegationPanel delegation={delegation} onPick={pickFile} hasRuntime={live !== null} />
+          ) : tab === "city" && mode === "runtime" && live ? (
+            <RuntimeList runtime={live} insights={insights} onPick={pickFile} />
+          ) : tab === "city" && timeline && data.history?.timeline ? (
+            <CommitList
+              history={data.history}
+              index={timeIndex}
+              setIndex={setTimeIndex}
+              insights={insights}
+              onPick={pickFile}
+              repoUrl={repoUrl}
+            />
+          ) : tab === "coupling" ? (
+            <CouplingList
+              insights={insights}
+              couplings={couplings}
+              hiddenOnly={hiddenOnly}
+              setHiddenOnly={setHiddenOnly}
+              all={allCouplings}
+              setAll={setAllCouplings}
+              onPick={setSelected}
+            />
+          ) : (
+            <HotspotList insights={insights} onPick={setSelected} />
+          )}
           {tab === "city" && (
             <section>
               <h3 className="gx-h">색 기준</h3>
@@ -191,46 +248,6 @@ export function InsightsView({
               </label>
               {showInfra && <InfraLegend infra={infra} />}
             </section>
-          )}
-          {tab === "city" && showInfra && infra && selectedInfra ? (
-            <InfraCard
-              infra={infra}
-              id={selectedInfra}
-              insights={insights}
-              sourceBase={sourceBase ?? null}
-              onPickFile={pickFile}
-              onPickNode={setSelectedInfra}
-              onClose={() => setSelectedInfra(null)}
-            />
-          ) : current ? (
-            <>
-              {tab === "city" && mode === "delegation" && <ZoneBox zone={delegation.files.get(current.path)} />}
-            <FileCard
-              file={current}
-              insights={insights}
-              graphHref={graphHref}
-              onPick={pickFile}
-              onClose={() => setSelected(null)}
-              infra={showInfra ? infra : null}
-              onPickInfra={setSelectedInfra}
-            />
-            </>
-          ) : tab === "city" && mode === "delegation" ? (
-            <DelegationPanel delegation={delegation} onPick={pickFile} hasRuntime={live !== null} />
-          ) : tab === "city" && mode === "runtime" && live ? (
-            <RuntimeList runtime={live} insights={insights} onPick={pickFile} />
-          ) : tab === "coupling" ? (
-            <CouplingList
-              insights={insights}
-              couplings={couplings}
-              hiddenOnly={hiddenOnly}
-              setHiddenOnly={setHiddenOnly}
-              all={allCouplings}
-              setAll={setAllCouplings}
-              onPick={setSelected}
-            />
-          ) : (
-            <HotspotList insights={insights} onPick={setSelected} />
           )}
         </aside>
       </div>
@@ -364,6 +381,96 @@ function CouplingList({
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/** 한 번에 보여 줄 커밋 수 (더 보기로 늘린다) */
+const COMMIT_PAGE = 40;
+
+/**
+ * 커밋 이력: 최신 커밋부터. 커밋을 누르면 코드 시티가 그 시점으로 바뀌고(시간 여행과 같은 위치),
+ * 그 커밋이 바꾼 파일이 펼쳐져 누르면 건물을 고른다.
+ */
+function CommitList({
+  history,
+  index,
+  setIndex,
+  insights,
+  onPick,
+  repoUrl,
+}: {
+  history: NonNullable<GraphData["history"]>;
+  index: number | null;
+  setIndex: (i: number | null) => void;
+  insights: Insights;
+  onPick: (path: string) => void;
+  repoUrl: string | null;
+}) {
+  const [shown, setShown] = useState(COMMIT_PAGE);
+  const events = history.timeline ?? [];
+  const files = history.timelineFiles ?? [];
+  const authors = history.authors ?? [];
+  const last = events.length - 1;
+  const current = index ?? last;
+  const order = events.map((_, i) => last - i).slice(0, shown);
+  const hasSubjects = events.some((e) => e.m);
+  return (
+    <section className="commits">
+      <h3 className="gx-h">
+        커밋 이력 <span className="gx-dim">{history.commits}개 · 최신순</span>
+      </h3>
+      <p className="gx-hint">커밋을 누르면 도시가 그 시점으로 바뀌고 그 커밋이 바꾼 건물이 빛나요. 아래 막대로 재생할 수 있어요.</p>
+      {!hasSubjects && <p className="gx-warn">커밋 제목이 없는 예전 분석이에요. 프로젝트 입구에서 &quot;다시 분석&quot;을 누르면 제목과 GitHub 링크가 생겨요.</p>}
+      <ol className="commit-list">
+        {order.map((i) => {
+          const e = events[i];
+          const open = i === current && index !== null;
+          const adds = e.c.reduce((n, c) => n + c[1], 0);
+          const dels = e.c.reduce((n, c) => n + c[2], 0);
+          return (
+            <li key={i} className={open ? "open" : i === current ? "now" : ""}>
+              <button className="commit-row" onClick={() => setIndex(open ? null : i)}>
+                <span className="commit-date">{new Date(e.at * 1000).toISOString().slice(0, 10)}</span>
+                <span className="commit-msg">{e.m || `${e.c.length}개 파일 변경`}</span>
+                <span className="gx-dim commit-meta">
+                  {authors[e.a] ?? "?"} · 파일 {e.c.length} · <span className="commit-add">+{adds}</span> <span className="commit-del">−{dels}</span>
+                </span>
+              </button>
+              {open && (
+                <div className="commit-detail">
+                  {e.h && repoUrl && (
+                    <a href={`${repoUrl}/commit/${e.h}`} target="_blank" rel="noreferrer" className="commit-link">
+                      <code>{e.h.slice(0, 7)}</code> GitHub ↗
+                    </a>
+                  )}
+                  <ul>
+                    {e.c.map(([f, add, del]) => {
+                      const path = files[f];
+                      if (!path) return null;
+                      return (
+                        <li key={f}>
+                          <button onClick={() => onPick(path)} title={path}>
+                            {insights.byPath.get(path)?.name ?? fileName(path)}
+                          </button>
+                          <span className="gx-dim">
+                            <span className="commit-add">+{add}</span> <span className="commit-del">−{del}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {shown < events.length && (
+        <button className="commit-more" onClick={() => setShown((n) => n + COMMIT_PAGE)}>
+          이전 커밋 더 보기 ({events.length - shown})
+        </button>
       )}
     </section>
   );

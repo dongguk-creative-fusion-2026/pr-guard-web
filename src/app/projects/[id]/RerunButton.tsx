@@ -19,7 +19,7 @@ export function RerunButton({ projectId, prNumber }: { projectId: number; prNumb
             const r = await rerunReview(projectId, prNumber);
             setMessage(r.error ?? r.message ?? null);
             // 새 리뷰의 진행 과정을 바로 보여 준다
-            if (r.reviewId) router.push(`/projects/${projectId}/reviews/${r.reviewId}`);
+            if (r.reviewId) router.push(`/projects/${projectId}/prs/${prNumber}?review=${r.reviewId}`);
           })
         }
       >

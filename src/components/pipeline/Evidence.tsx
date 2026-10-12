@@ -215,7 +215,7 @@ export function EvidenceVerdicts({
           {traced && projectId !== undefined && (
             <p className="ev-links">
               <Link href={`/projects/${projectId}/graph?runtime=1`}>⚡ 코드 그래프에서 런타임 보기</Link>
-              <Link href={`/projects/${projectId}/insights?tab=city&mode=runtime`}>🏙️ 코드 시티에서 런타임 보기</Link>
+              <Link href={`/projects/${projectId}/commits?tab=city&mode=runtime`}>🏙️ 코드 시티에서 런타임 보기</Link>
             </p>
           )}
         </>
