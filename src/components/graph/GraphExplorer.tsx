@@ -9,7 +9,7 @@ import type { GraphData, ProjectRuntime } from "@/lib/api";
 import { fileName, formatTime, shortSha } from "@/lib/format";
 import {
   buildCodeGraph,
-  groupCommunities,
+  groupStructure,
   IN_COLOR,
   OUT_COLOR,
   typesText,
@@ -116,7 +116,7 @@ export function GraphExplorer({
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null);
 
   const { groups, graph, boxes, rt } = useMemo(() => {
-    const { groups, groupOf } = groupCommunities(data);
+    const { groups, groupOf } = groupStructure(data);
     const built = buildCodeGraph(data, groups, groupOf);
     const rt = runtime ? buildRuntime(runtime, data) : null;
     // 정적 분석에는 없고 실행 중에만 일어난 호출 (인터페이스 구현 · 상속 · 프레임워크 호출)을 간선으로 더한다
@@ -594,8 +594,8 @@ export function GraphExplorer({
           )}
         </section>
         <section>
-          <h3 className="gx-h">기능 묶음</h3>
-          <p className="gx-dim">GitNexus 가 찾은 커뮤니티. 눌러서 숨기기</p>
+          <h3 className="gx-h">구조</h3>
+          <p className="gx-dim">모듈 · 계층. 코드 시티 구역과 같은 색. 눌러서 숨기기</p>
           <ul className="gx-legend">
             {groups.map((g) => {
               const off = hidden.has(g.label);

@@ -1,9 +1,8 @@
 import type { FileHistory, GraphData } from "@/lib/api";
 import { fileName } from "@/lib/format";
-import { codeFunctions, groupCommunities, UNGROUPED_COLOR } from "../graph/graphModel";
+import { codeFunctions, groupCommunities, groupStructure, TEST_PATH, UNGROUPED_COLOR } from "../graph/graphModel";
 
 const SOURCE_EXT = /\.(java|kt|kts|scala|groovy|ts|tsx|js|jsx|mjs|cjs|py|go|rs|cs|cpp|cc|c|h|hpp|rb|php|swift|vue|svelte)$/i;
-const TEST_PATH = /(^|\/)(test|tests|__tests__|spec)\/|\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt)$|_test\.(go|py)$|(^|\/)test_[^/]+\.py$/i;
 
 export type FileMetric = {
   path: string;
@@ -53,48 +52,10 @@ export type Insights = {
 
 export type FunctionCalls = { id: string; name: string; line: number; out: string[]; in: string[] };
 
-/** 구조 색: 채도를 낮춘 색 (건물 · 구역 바닥) */
-const STRUCTURE_COLORS = ["#7aa2f7", "#9ece6a", "#e0af68", "#f7768e", "#bb9af7", "#7dcfff", "#ff9e64", "#73daca", "#c0caf5", "#d4a5d4", "#a9b665", "#89b4fa"];
-const MAX_DISTRICTS = 12;
-const MAX_BLOCKS = 8;
-const CODE_ROOTS = new Set(["src", "main", "java", "kotlin", "scala", "groovy", "js", "ts", "app", "lib"]);
-
-/** src 앞까지가 모듈 (멀티 모듈 · 마이크로서비스 레포). src 가 없으면 "" */
-function moduleOf(path: string): string {
-  const parts = path.split("/");
-  const i = parts.indexOf("src");
-  return i > 0 ? parts.slice(0, i).join("/") : "";
-}
-
-/** 계층: 테스트 · 프론트엔드 · 리소스, 그 밖에는 파일이 든 패키지(디렉터리) 이름 */
-function layerOf(path: string, test: boolean): string {
-  if (test) return "테스트";
-  const dirs = path.split("/").slice(0, -1);
-  if (dirs.includes("resources") || dirs.includes("static") || dirs.includes("webapp")) {
-    return /\.(js|jsx|ts|tsx|vue|css|scss|html)$/i.test(path) ? "프론트엔드" : "리소스";
-  }
-  const leaf = dirs[dirs.length - 1];
-  return !leaf || CODE_ROOTS.has(leaf) ? "(루트)" : leaf;
-}
-
-/** 모듈 이름들의 공통 앞부분(spring-petclinic- 같은)을 떼어 짧게 */
-function trimCommonPrefix(names: string[]): Map<string, string> {
-  const real = names.filter(Boolean);
-  let prefix = real[0] ?? "";
-  for (const n of real) while (prefix && !n.startsWith(prefix)) prefix = prefix.slice(0, -1);
-  const cut = Math.max(prefix.lastIndexOf("-"), prefix.lastIndexOf("/")) + 1;
-  return new Map(names.map((n) => [n, n ? n.slice(real.length > 1 ? cut : 0) || n : "(루트)"]));
-}
-
-/** 너무 많은 묶음은 작은 것부터 "기타" 로 */
-function capGroups(counts: Map<string, number>, max: number): (label: string) => string {
-  const keep = new Set([...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, max - 1).map(([k]) => k));
-  return (label) => (counts.size <= max || keep.has(label) ? label : "기타");
-}
-
 /** 그래프 + git 이력에서 파일별 지표를 만든다 */
 export function computeInsights(data: GraphData): Insights {
   const { groups, groupOf } = groupCommunities(data);
+  const structure = groupStructure(data);
   const colorOf = new Map(groups.map((g) => [g.label, g.color]));
   const fnsByFile = new Map<string, { count: number; longest: number }>();
   for (const f of codeFunctions(data)) {
@@ -110,7 +71,7 @@ export function computeInsights(data: GraphData): Insights {
   const maxLines = Math.max(1, ...data.nodes.map(lineOf));
 
   const files: FileMetric[] = data.nodes.map((n) => {
-    const group = groupOf(n.community) ?? "기타";
+    const group = groupOf(n) ?? "기타";
     const h = history?.files[n.id] ?? null;
     const lines = lineOf(n);
     // 변경 빈도와 크기를 곱한다 (둘 다 로그: 한 파일이 압도적으로 많이 바뀌어도 나머지가 구분되게). 자주 바뀌는 큰 파일일수록 1 에 가깝다
@@ -129,51 +90,29 @@ export function computeInsights(data: GraphData): Insights {
       test: TEST_PATH.test(n.id),
       source: SOURCE_EXT.test(n.id),
       hotspot,
-      district: "",
-      block: "",
+      district: structure.groupOf(n) ?? "기타",
+      block: structure.blockOf(n.id),
       districtColor: UNGROUPED_COLOR,
     };
   });
   const byPath = new Map(files.map((f) => [f.path, f]));
 
-  // 프로젝트 구조: 모듈이 둘 이상이면 구역 = 모듈 · 블록 = 계층, 아니면 구역 = 계층
-  const modules = [...new Set(files.map((f) => moduleOf(f.path)))];
-  const modular = modules.filter(Boolean).length >= 2;
-  const moduleLabel = trimCommonPrefix(modules);
-  const raw = files.map((f) => {
-    const layer = layerOf(f.path, f.test);
-    return modular ? { f, district: moduleLabel.get(moduleOf(f.path)) ?? "(루트)", block: layer } : { f, district: layer, block: "" };
+  // 프로젝트 구조 (코드 그래프와 같은 기준): 구역 = 모듈 또는 계층, 블록 = 모듈 안 계층
+  const modular = structure.modular;
+  const districts: District[] = structure.groups.map((g) => {
+    const list = files.filter((f) => f.district === g.label);
+    const blocks = new Map<string, FileMetric[]>();
+    for (const f of list) {
+      f.districtColor = g.color;
+      blocks.set(f.block, [...(blocks.get(f.block) ?? []), f]);
+    }
+    return {
+      label: g.label,
+      color: g.color,
+      files: list,
+      blocks: [...blocks.entries()].sort((x, y) => y[1].length - x[1].length).map(([label, fs]) => ({ label, files: fs })),
+    };
   });
-  const districtCount = new Map<string, number>();
-  for (const r of raw) districtCount.set(r.district, (districtCount.get(r.district) ?? 0) + 1);
-  const capDistrict = capGroups(districtCount, MAX_DISTRICTS);
-  for (const r of raw) r.district = capDistrict(r.district);
-  const districtMap = new Map<string, FileMetric[]>();
-  for (const r of raw) {
-    r.f.district = r.district;
-    r.f.block = r.block;
-    districtMap.set(r.district, [...(districtMap.get(r.district) ?? []), r.f]);
-  }
-  const districts: District[] = [...districtMap.entries()]
-    .sort((a, b) => Number(a[0] === "테스트") - Number(b[0] === "테스트") || b[1].length - a[1].length || a[0].localeCompare(b[0]))
-    .map(([label, list], i) => {
-      const color = label === "테스트" || label === "기타" ? UNGROUPED_COLOR : STRUCTURE_COLORS[i % STRUCTURE_COLORS.length];
-      const blockCount = new Map<string, number>();
-      for (const f of list) blockCount.set(f.block, (blockCount.get(f.block) ?? 0) + 1);
-      const capBlock = capGroups(blockCount, MAX_BLOCKS);
-      const blocks = new Map<string, FileMetric[]>();
-      for (const f of list) {
-        f.block = capBlock(f.block);
-        f.districtColor = color;
-        blocks.set(f.block, [...(blocks.get(f.block) ?? []), f]);
-      }
-      return {
-        label,
-        color,
-        files: list,
-        blocks: [...blocks.entries()].sort((a, b) => b[1].length - a[1].length).map(([b, fs]) => ({ label: b, files: fs })),
-      };
-    });
 
   const grouped = new Map<string, FileMetric[]>();
   for (const f of files) grouped.set(f.group, [...(grouped.get(f.group) ?? []), f]);
