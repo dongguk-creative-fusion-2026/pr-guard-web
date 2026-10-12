@@ -14,6 +14,16 @@ export function formatTime(iso: string | null): string {
   return iso ? fmt.format(new Date(iso)) : "-";
 }
 
+/** "방금" · "12분 전" · "3시간 전" · "5일 전" */
+export function timeAgo(iso: string | null, now = Date.now()): string {
+  if (!iso) return "-";
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}시간 전`;
+  return `${Math.floor(minutes / (60 * 24))}일 전`;
+}
+
 export function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }

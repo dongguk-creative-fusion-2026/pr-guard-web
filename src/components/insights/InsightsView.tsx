@@ -419,10 +419,9 @@ function CommitList({
   return (
     <section className="commits">
       <h3 className="gx-h">
-        커밋 이력 <span className="gx-dim">{history.commits}개 · 최신순</span>
+        커밋 <span className="gx-dim">{history.commits}</span>
       </h3>
-      <p className="gx-hint">커밋을 누르면 도시가 그 시점으로 바뀌고 그 커밋이 바꾼 건물이 빛나요. 아래 막대로 재생할 수 있어요.</p>
-      {!hasSubjects && <p className="gx-warn">커밋 제목이 없는 예전 분석이에요. 프로젝트 입구에서 &quot;다시 분석&quot;을 누르면 제목과 GitHub 링크가 생겨요.</p>}
+      {!hasSubjects && <p className="gx-warn">다시 분석하면 커밋 제목이 보여요.</p>}
       <ol className="commit-list">
         {order.map((i) => {
           const e = events[i];

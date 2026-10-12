@@ -42,9 +42,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <div className="entry-grid">
         <Link href={`/projects/${id}/prs`} className="entry-card pr">
-          <span className="entry-kicker">PR 이력</span>
-          <h2>이 PR, 머지해도 되나?</h2>
-          <p className="muted">열린 PR 을 차단 · 확인 필요 · 자동 통과로 나누고, PR 마다 판정과 근거, 영향 범위를 봅니다.</p>
+          <h2>PR 이력</h2>
           <div className="entry-stats">
             <div>
               <b>{stats.open}</b>
@@ -52,7 +50,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </div>
             <div>
               <b style={{ color: LANE_META.CHECK.color }}>{stats.human}</b>
-              <span>사람이 볼 PR</span>
+              <span>볼 PR</span>
             </div>
             <div>
               <b style={{ color: LANE_META.PASS.color }}>{stats.pass}</b>
@@ -60,16 +58,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </div>
             <div>
               <b>{stats.medianSeconds != null ? `${stats.medianSeconds}초` : "-"}</b>
-              <span>리뷰 시간 (중앙값)</span>
+              <span>리뷰 시간</span>
             </div>
           </div>
-          <span className="entry-go">대기열 열기 →</span>
+          <span className="entry-go">→</span>
         </Link>
 
         <Link href={`/projects/${id}/commits`} className="entry-card commit">
-          <span className="entry-kicker">커밋 이력</span>
-          <h2>레포는 어떻게 변해 왔고, 어디가 위험한가?</h2>
-          <p className="muted">커밋 순서대로 코드 시티를 따라가며 핫스팟 · 숨은 결합 · AI 위임 구역 · 함수 그래프를 봅니다.</p>
+          <h2>커밋 이력</h2>
           <div className="entry-stats">
             <div>
               <b>{history?.commits ?? "-"}</b>
@@ -94,24 +90,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </p>
           )}
           {hot.length > 0 && (
-            <p className="entry-hot muted">
-              자주 바뀐 파일: {hot.map(([path, h]) => `${fileName(path)} (${h.commits})`).join(" · ")}
-            </p>
+            <p className="entry-hot muted">{hot.map(([path, h]) => `${fileName(path)} ${h.commits}`).join(" · ")}</p>
           )}
-          <span className="entry-go">코드 시티 열기 →</span>
+          <span className="entry-go">→</span>
         </Link>
       </div>
 
       <section className="entry-foot">
         <GraphState projectId={id} graph={graph} />
-        <p className="muted">
-          PR 코멘트 {project.commentEnabled ? "켜짐" : "꺼짐"} · MAJOR {project.majorThreshold ?? 1}건부터 수정 후 머지 · 기본 브랜치{" "}
-          <code>{project.defaultBranch}</code> ·{" "}
-          <a href={project.htmlUrl} target="_blank" rel="noreferrer">
-            GitHub ↗
-          </a>{" "}
-          · <Link href={`/projects/${id}/onboarding?step=3`}>레포 브리핑</Link>
-        </p>
+        <a href={project.htmlUrl} target="_blank" rel="noreferrer">
+          GitHub ↗
+        </a>
+        <Link href={`/projects/${id}/onboarding?step=3`}>레포 브리핑</Link>
         <ProjectActions projectId={id} />
       </section>
     </main>
