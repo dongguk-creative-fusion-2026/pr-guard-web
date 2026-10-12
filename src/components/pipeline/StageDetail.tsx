@@ -5,7 +5,18 @@ import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
+import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
+import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
+
+type GroundView = {
+  severity: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  status: GroundStatus;
+  layers: { layer: GroundLayerId; mark: GroundMark; note: string }[];
+};
 
 type FindingView = { severity: string; ruleId: string; title: string; file: string | null; line: number | null };
 
@@ -238,9 +249,50 @@ export function StageDetail({
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 
+      {d && stage === "GROUND" && (
+        <>
+          <p className="muted">
+            모든 지적을 코드 인덱스 · git 이력 · 실행 · AI 층에 비춰 봅니다. 인덱스의 사실과 어긋나는 AI 지적은 판정에서 뺍니다.
+          </p>
+          <ul className="finding-list">
+            {(d.findings as GroundView[]).map((f, i) => (
+              <motion.li key={`${f.title}-${i}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
+                <span className={`sev ${f.severity}`}>{f.severity}</span>{" "}
+                <span className={f.status === "REFUTED" ? "struck" : undefined}>{f.title}</span>{" "}
+                <span className="muted">
+                  {fileName(f.file)}
+                  {f.line != null && `:${f.line}`}
+                </span>{" "}
+                <span className="layer-chips">
+                  {LAYER_ORDER.map((id) => {
+                    const l = f.layers.find((x) => x.layer === id);
+                    const mark = l?.mark ?? "NONE";
+                    return (
+                      <i
+                        key={id}
+                        className={`layer-chip ${mark}`}
+                        style={mark === "NONE" ? undefined : { color: LAYER_META[id].color, borderColor: LAYER_META[id].color }}
+                        title={`${LAYER_META[id].label}: ${l?.note ?? ""}`}
+                      >
+                        {MARK_META[mark].symbol} {LAYER_META[id].short}
+                      </i>
+                    );
+                  })}
+                </span>
+                <div className="muted" style={{ color: STATUS_META[f.status].color }}>
+                  {STATUS_META[f.status].label}
+                  {f.status === "REFUTED" && ` — ${f.layers.find((x) => x.layer === "INDEX")?.note ?? ""}`}
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {d && stage === "VERDICT" && (
         <p>
-          BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor} → <strong>{state.message}</strong>
+          BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor}
+          {d.refuted ? ` (인덱스와 어긋난 지적 ${d.refuted}건 제외)` : ""} → <strong>{state.message}</strong>
           <br />
           <span className="muted">판정 규칙: BLOCKER 1건 이상 → 머지 비권장, MAJOR 1건 이상 → 수정 후 머지</span>
         </p>

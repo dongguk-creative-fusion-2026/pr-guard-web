@@ -11,6 +11,17 @@ import {
   VERDICT_LABEL,
 } from "@/lib/format";
 import { computeImpact, type Impact } from "@/components/graph/impact";
+import {
+  countByStatus,
+  groundingOf,
+  hasGrounding,
+  LAYER_META,
+  LAYER_ORDER,
+  layerOf,
+  MARK_META,
+  STATUS_META,
+  STATUS_ORDER,
+} from "@/lib/grounding";
 import { computeDelegation, touchedZones, ZONE_META, type FileZone, type Zone } from "@/lib/delegation";
 import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
@@ -33,8 +44,11 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const { review, findings, context } = detail;
+  const { review, findings: all, context } = detail;
   if (review.projectId !== projectId) notFound();
+  // 코드 인덱스와 어긋나 판정에서 뺀 지적은 따로 보여 준다
+  const findings = all.filter((f) => groundingOf(f).status !== "REFUTED");
+  const refuted = all.filter((f) => groundingOf(f).status === "REFUTED");
 
   return (
     <>
@@ -77,6 +91,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           </div>
           {review.summary && <p>{review.summary}</p>}
 
+          {all.length > 0 && <GroundCard findings={all} href={`/projects/${projectId}/reviews/${reviewId}/layers`} />}
+
           <BehaviorCard rows={behaviorRows(events)} />
 
           {graph?.graph && context && (
@@ -97,6 +113,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
 
           <h2>지적 사항</h2>
           {findings.length === 0 ? <div className="empty">지적 사항 없음</div> : <FindingTable findings={findings} />}
+          {refuted.length > 0 && (
+            <details className="refuted-findings">
+              <summary>
+                코드 인덱스와 어긋나 판정에서 뺀 AI 지적 {refuted.length}건
+              </summary>
+              <FindingTable findings={refuted} />
+            </details>
+          )}
 
           {context && <ContextSection context={context} />}
 
@@ -170,6 +194,7 @@ function FindingTable({ findings }: { findings: Finding[] }) {
           <tr>
             <th>심각도</th>
             <th>분류</th>
+            <th>근거</th>
             <th>위치</th>
             <th>내용</th>
           </tr>
@@ -185,20 +210,85 @@ function FindingTable({ findings }: { findings: Finding[] }) {
                 <div className="muted">{f.source === "LLM" ? "AI" : f.ruleId}</div>
               </td>
               <td>
+                <LayerChips finding={f} />
+              </td>
+              <td>
                 <code>
                   {fileName(f.file)}
                   {f.line != null && `:${f.line}`}
                 </code>
               </td>
               <td>
-                <strong>{f.title}</strong>
+                <strong className={groundingOf(f).status === "REFUTED" ? "struck" : undefined}>{f.title}</strong>
                 <div>{f.message}</div>
+                {groundingOf(f).status === "REFUTED" && (
+                  <div className="refuted-note">인덱스: {layerOf(groundingOf(f), "INDEX").note}</div>
+                )}
                 {f.evidence && <div className="muted">근거: {f.evidence}</div>}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** 층별 판단을 작은 칩 네 개로: 인덱스 · 이력 · 실행 · AI. 칩에 올리면 그 층의 근거 */
+function LayerChips({ finding }: { finding: Finding }) {
+  const g = groundingOf(finding);
+  return (
+    <span className="layer-chips">
+      {LAYER_ORDER.map((id) => {
+        const l = layerOf(g, id);
+        return (
+          <i
+            key={id}
+            className={`layer-chip ${l.mark}`}
+            style={l.mark === "NONE" ? undefined : { color: LAYER_META[id].color, borderColor: LAYER_META[id].color }}
+            title={`${LAYER_META[id].label} · ${MARK_META[l.mark].label}${l.note ? `: ${l.note}` : ""}`}
+          >
+            {MARK_META[l.mark].symbol} {LAYER_META[id].short}
+          </i>
+        );
+      })}
+    </span>
+  );
+}
+
+/** 지적이 어느 층에서 확인됐는지 요약. 누르면 근거 층 3D 화면 */
+function GroundCard({ findings, href }: { findings: Finding[]; href: string }) {
+  const byStatus = countByStatus(findings);
+  const recorded = hasGrounding(findings);
+  return (
+    <div className="graph-card ground-card">
+      <div className="graph-card-main">
+        <div>
+          <div className="graph-card-title">근거 층</div>
+          <div className="graph-card-status">
+            지적마다 코드 인덱스 · git 이력 · 실행 · AI 판단 중 어느 층이 확인했는지
+            {!recorded && " (근거 확인 전 리뷰: 지적을 만든 층만 표시)"}
+          </div>
+        </div>
+        <div className="graph-card-stats">
+          {STATUS_ORDER.map((s) => (
+            <span key={s}>
+              <b style={{ color: STATUS_META[s].color }}>{byStatus[s]}</b> {STATUS_META[s].label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="ground-bar">
+        {STATUS_ORDER.map((s) =>
+          byStatus[s] > 0 ? <i key={s} style={{ flex: byStatus[s], background: STATUS_META[s].color }} /> : null,
+        )}
+      </div>
+      <div className="graph-card-actions">
+        <Link href={href} className="graph-open ground-open">
+          근거 층 열기 →
+        </Link>
+        {byStatus.REFUTED > 0 && <span className="graph-card-note">인덱스와 어긋난 AI 지적 {byStatus.REFUTED}건은 판정에서 뺐어요</span>}
+      </div>
     </div>
   );
 }

@@ -3789,3 +3789,296 @@ a.button.primary {
 .ast-legend span::before {
   content: "■ ";
 }
+
+/* ── 근거 층: 지적마다 어느 층(인덱스 · 이력 · 실행 · AI)이 확인했는지 ── */
+.struck {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+.layer-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.layer-chip {
+  font-style: normal;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.layer-chip.NONE {
+  opacity: 0.45;
+}
+.layer-chip.RELATED {
+  border-style: dashed;
+}
+.layer-chip.REFUTED {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+.refuted-findings {
+  margin: 12px 0;
+}
+.refuted-findings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.refuted-note {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #ef4444;
+}
+.ground-card {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(56, 189, 248, 0.22), transparent 45%),
+    radial-gradient(circle at 15% 90%, rgba(244, 114, 182, 0.16), transparent 40%),
+    #0f0f1a;
+}
+.ground-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-top: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1a2a;
+}
+.ground-bar i {
+  display: block;
+}
+.graph-open.ground-open {
+  background: #0284c7;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
+.graph-open.ground-open:hover {
+  background: #0ea5e9;
+}
+
+/* 근거 층 전체 화면 */
+.gl-slab-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  transform: translate(-8px, -50%);
+  padding: 4px 8px;
+  border-left: 3px solid;
+  border-radius: 4px;
+  background: rgba(7, 7, 13, 0.82);
+  color: #a5a5bd;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.gl-slab-label b {
+  font-size: 12px;
+}
+.gl-pin-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(14, 14, 24, 0.95);
+  border: 1px solid #2a2a40;
+  color: #e4e4ed;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gl-pin-tip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gl-legend {
+  flex-wrap: wrap;
+  max-width: calc(100% - 32px);
+}
+.gl-legend b {
+  margin-right: 3px;
+}
+.gl-legend .gl-x {
+  color: #ef4444;
+}
+.gl-panel {
+  width: 380px;
+}
+.gl-lead {
+  margin: 10px 0 8px;
+  color: #c8c8d8;
+}
+.gl-lead b {
+  font-size: 1.1rem;
+  color: #fff;
+}
+.gl-lead b.gl-refuted-num {
+  color: #94a3b8;
+}
+.gl-status-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #1a1a2a;
+}
+.gl-status-bar i {
+  display: block;
+}
+.gl-layers {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.gl-layers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.gl-layers li > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.gl-layers li > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gl-layers li > div span {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-layers em {
+  font-style: normal;
+  font-weight: 700;
+  color: #e4e4ed;
+}
+.gl-group-hint {
+  margin: 2px 0 8px;
+}
+.gl-findings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gl-findings > li {
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.gl-findings > li.open {
+  background: #12121e;
+  outline: 1px solid #2a2a40;
+}
+.gl-finding {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.gl-finding:hover {
+  background: #161625;
+}
+.gl-title {
+  overflow-wrap: anywhere;
+}
+.gl-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 3px;
+}
+.gl-chip {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 5px;
+  border: 1px solid #2a2a40;
+  border-radius: 4px;
+  color: #4a4a60;
+}
+.gl-chip.RELATED {
+  border-style: dashed;
+}
+.gl-chip.REFUTED {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+.gl-finding .gx-path {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.gl-detail {
+  padding: 0 10px 10px;
+}
+.gl-evidence {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gl-evidence li {
+  display: grid;
+  grid-template-columns: 14px 44px 1fr;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid #1a1a2a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.gl-evidence li.NONE {
+  color: #6a6a80;
+}
+.gl-mark {
+  font-weight: 700;
+  text-align: center;
+}
+.gl-claim {
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.gl-claim code {
+  font-size: 11px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #1a1a2a;
+}
+.gl-message {
+  margin: 8px 0;
+  color: #c8c8d8;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.gl-diff {
+  font-size: 12px;
+  color: #7dd3fc;
+}
+@media (max-width: 760px) {
+  .gx-body:has(.gl-panel) {
+    flex-direction: column;
+  }
+  .gl-panel {
+    width: 100%;
+    max-height: 55vh;
+    border-left: none;
+    border-top: 1px solid #1e1e30;
+  }
+}
