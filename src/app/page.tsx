@@ -2,12 +2,18 @@ import Link from "next/link";
 import { api, ApiError, type Project } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { buildQueue, LANE_META, LANES, type Lane, type QueueStats } from "@/lib/queue";
+import { summarizeStack } from "@/lib/stack";
 import { Logo } from "@/components/Logo";
 import { RegisterForm } from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
 
-type Card = { project: Project; stats: QueueStats | null; lanes: Record<Lane, number> | null };
+type Card = {
+  project: Project;
+  stats: QueueStats | null;
+  lanes: Record<Lane, number> | null;
+  stack: ReturnType<typeof summarizeStack>;
+};
 
 /** 레포 이름으로 고정된 색 (카드 앞 표식) */
 function hue(name: string): number {
@@ -27,13 +33,19 @@ export default async function Home() {
   // 카드마다 대기열 숫자를 같이 보여 준다. 한 프로젝트가 실패해도 나머지는 그린다
   const cards: Card[] = await Promise.all(
     projects.map(async (project) => {
+      // 레포 구성(언어 · 인프라)은 없어도 카드는 그린다
+      const [repo, graph] = await Promise.all([
+        api.getRepoInfo(project.id).catch(() => null),
+        api.getGraph(project.id).catch(() => null),
+      ]);
+      const stack = summarizeStack(repo, graph?.graph?.infra);
       try {
         const [pulls, reviews] = await Promise.all([api.listPulls(project.id), api.listReviews(project.id, 100)]);
         const { items, stats } = buildQueue(pulls, reviews);
         const lanes = Object.fromEntries(LANES.map((l) => [l, items.filter((i) => i.lane === l).length])) as Record<Lane, number>;
-        return { project, stats, lanes };
+        return { project, stats, lanes, stack };
       } catch {
-        return { project, stats: null, lanes: null };
+        return { project, stats: null, lanes: null, stack };
       }
     }),
   );
@@ -55,7 +67,7 @@ export default async function Home() {
         {error && <p className="error">{error}</p>}
 
         <div className="pgrid">
-          {cards.map(({ project: p, stats, lanes }) => (
+          {cards.map(({ project: p, stats, lanes, stack }) => (
             <Link key={p.id} href={`/projects/${p.id}`} className="pc" style={{ ["--h" as string]: hue(p.name) }}>
               <div className="pc-top">
                 <span className="pc-mark">{p.name.slice(0, 1).toUpperCase()}</span>
@@ -65,6 +77,22 @@ export default async function Home() {
                 </div>
                 <span className={`pc-live${p.lastPollError ? " err" : ""}`} title={p.lastPollError ?? "정상"} />
               </div>
+              {(stack.languages.length > 0 || stack.parts.length > 0) && (
+                <div className="pc-stack">
+                  {stack.languages.map((l) => (
+                    <span key={l.name} className="pc-lang">
+                      <i style={{ background: l.color }} />
+                      {l.name}
+                      <em>{l.pct}%</em>
+                    </span>
+                  ))}
+                  {stack.parts.map((part) => (
+                    <span key={part.label} className={`pc-part ${part.kind}`}>
+                      {part.label}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="pc-stats">
                 <div>
                   <b>{stats?.open ?? p.openPullCount}</b>
