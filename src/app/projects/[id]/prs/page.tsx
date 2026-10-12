@@ -36,18 +36,17 @@ export default async function PullQueuePage({ params }: { params: Promise<{ id: 
         <div className="bneck-arrow">→</div>
         <div>
           <b style={{ color: LANE_META.CHECK.color }}>{stats.human}</b>
-          <span>사람이 볼 PR</span>
+          <span>볼 PR</span>
           <small className="muted">차단 {byLane("BLOCKED").length} · 확인 필요 {byLane("CHECK").length}</small>
         </div>
         <div>
           <b style={{ color: LANE_META.PASS.color }}>{stats.pass}</b>
           <span>자동 통과</span>
-          <small className="muted">{stats.open ? Math.round((stats.pass / stats.open) * 100) : 0}% 는 사람이 깊게 안 봐도 됨</small>
+          <small className="muted">{stats.open ? Math.round((stats.pass / stats.open) * 100) : 0}%</small>
         </div>
         <div>
           <b>{stats.medianSeconds != null ? `${stats.medianSeconds}초` : "-"}</b>
-          <span>리뷰 시간 (중앙값)</span>
-          <small className="muted">최근 끝난 리뷰 {stats.timed}건</small>
+          <span>리뷰 시간</span>
         </div>
         {stats.reviewing > 0 && (
           <div>
@@ -74,7 +73,6 @@ export default async function PullQueuePage({ params }: { params: Promise<{ id: 
                 <i style={{ background: LANE_META[lane].color }} />
                 <b>{LANE_META[lane].label}</b>
                 <span className="lane-count">{list.length}</span>
-                <span className="muted lane-hint">{LANE_META[lane].hint}</span>
               </header>
               {list.length === 0 ? <p className="muted lane-empty">없음</p> : list.map((item) => <PullCard key={item.pull.id} item={item} projectId={id} />)}
             </section>

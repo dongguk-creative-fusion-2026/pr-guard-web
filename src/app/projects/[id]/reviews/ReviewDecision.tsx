@@ -148,14 +148,12 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                 <>
                   <FindingGroup
                     title="근거가 있는 지적"
-                    hint="AI 말고도 코드 인덱스나 실행 검증이 같은 문제를 찾았어요"
                     color={STATUS_META.CONFIRMED.color}
                     findings={confirmed}
                     diffUrl={diffUrl}
                   />
                   <FindingGroup
                     title="사람이 확인할 지적"
-                    hint="AI 만 주장해요. 층별 근거와 바뀐 줄을 보고 판단하세요"
                     color={STATUS_META.AI_ONLY.color}
                     findings={aiOnly}
                     diffUrl={diffUrl}
@@ -221,13 +219,11 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
 /** 지적 묶음: 한 줄 요약(심각도 · 제목 · 위치 · 층 칩)을 펴면 내용, 층별 근거, GitHub 의 바뀐 줄 */
 function FindingGroup({
   title,
-  hint,
   color,
   findings,
   diffUrl,
 }: {
   title: string;
-  hint: string;
   color: string;
   findings: Finding[];
   diffUrl: (f: Finding) => string;
@@ -238,7 +234,6 @@ function FindingGroup({
       <h2 style={{ color }}>
         {title} <span className="muted">{findings.length}</span>
       </h2>
-      <p className="muted fgroup-hint">{hint}</p>
       {findings.map((f) => {
         const g = groundingOf(f);
         return (
