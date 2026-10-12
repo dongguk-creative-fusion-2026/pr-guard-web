@@ -4459,6 +4459,137 @@ main.en {
   }
 }
 
+/* 입구: 코드 시티를 바닥에 깔고 오른쪽에 패널 기둥 */
+main.en.en-stage {
+  position: relative;
+  max-width: none;
+  height: calc(100vh - var(--bar-h));
+  padding: 0;
+  overflow: hidden;
+}
+.en-city {
+  position: absolute;
+  inset: 0;
+  background: #07070d;
+}
+.en-stage .en-overlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 420px;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.en-city > .city-canvas {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+.en-stage .en-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.en-stage .en-panel {
+  padding: 20px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(22, 22, 26, 0.86);
+  backdrop-filter: blur(10px);
+}
+.en-stage .en-list a {
+  padding: 9px 2px;
+}
+.en-stage .ob-banner,
+.en-stage .error {
+  margin: 0;
+}
+.en-stage .entry-foot {
+  gap: 10px 16px;
+  margin-top: 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(22, 22, 26, 0.86);
+  backdrop-filter: blur(10px);
+}
+.en-legend {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(14, 14, 17, 0.8);
+  color: var(--fg-2);
+  font-size: 12px;
+  pointer-events: none;
+}
+.en-legend i,
+.en-hover-pr i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+.en-legend-dim {
+  color: var(--muted);
+}
+.en-hover {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(14, 14, 17, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+.en-hover b {
+  color: var(--fg);
+  font-size: 13px;
+}
+.en-hover-pr {
+  color: var(--fg-2);
+}
+@media (max-width: 900px) {
+  main.en.en-stage {
+    height: auto;
+    overflow: visible;
+  }
+  .en-city {
+    position: relative;
+    height: 340px;
+  }
+  .en-city > .city-canvas {
+    position: relative;
+    height: 100%;
+  }
+  .en-stage .en-overlay {
+    position: static;
+    width: auto;
+    padding: 16px;
+    overflow: visible;
+  }
+  .en-hover {
+    display: none;
+  }
+}
+
 /* PR 이력: 대기열 */
 main.qv {
   padding-top: 32px;
