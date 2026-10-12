@@ -85,7 +85,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <section className="en-panel">
           <header>
             <h2>커밋 이력</h2>
-            <Link href={`/projects/${id}/commits`}>커밋 그래프</Link>
+            <Link href={`/projects/${id}/commits?tab=graph`}>커밋 그래프</Link>
           </header>
           <div className="statline compact">
             <div>
@@ -111,7 +111,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <ul className="en-list">
               {commits.map((c, i) => (
                 <li key={i}>
-                  <Link href={`/projects/${id}/commits`}>
+                  <Link href={`/projects/${id}/commits?tab=graph`}>
                     <span className="en-num mono">{c.h ? c.h.slice(0, 7) : "-------"}</span>
                     <span className="en-title">{c.m || `${c.c.length}개 파일 변경`}</span>
                     <span className="en-side" title={formatTime(new Date(c.at * 1000).toISOString())}>

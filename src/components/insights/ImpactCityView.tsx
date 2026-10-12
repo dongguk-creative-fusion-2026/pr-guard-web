@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { computeImpact, worstSeverity } from "@/components/graph/impact";
+import { useMemo, useState, type ReactNode } from "react";
+import { worstSeverity } from "@/components/graph/impact";
 import type { AnalysisContext, Finding, GraphData } from "@/lib/api";
 import { CodeCity, LEVEL_COLORS, type CityImpact } from "./CodeCity";
 import { computeInsights } from "./metrics";
+import { useCityImpact } from "./useCityImpact";
 
-const REVEAL_MS = [500, 1300, 2100];
 const LEVEL_LABEL = ["바뀐 파일", "직접 영향", "간접 영향"] as const;
 const LEVEL_HINT = ["이번 PR 이 고친 파일", "바뀐 함수를 호출하는 파일", "직접 영향 파일을 호출하는 파일"] as const;
 
@@ -26,33 +26,8 @@ type Props = {
 /** PR 영향 시티: 바뀐 건물이 솟아 빛나고, 그 파일을 호출하는 건물로 단계별로 번진다 */
 export function ImpactCityView({ data, context, findings, title, subtitle, backHref, impact2dHref, fontFamily, header }: Props) {
   const insights = useMemo(() => computeInsights(data), [data]);
-  const impact = useMemo(() => computeImpact(data, context, findings), [data, context, findings]);
-  const [reveal, setReveal] = useState(-1);
-  const [round, setRound] = useState(0);
+  const { impact, cityImpact, replay } = useCityImpact(data, context, findings);
   const [selected, setSelected] = useState<string | null>(null);
-
-  useEffect(() => {
-    setReveal(-1);
-    const timers = REVEAL_MS.map((ms, level) => setTimeout(() => setReveal(level), ms));
-    return () => timers.forEach(clearTimeout);
-  }, [round]);
-
-  const cityImpact: CityImpact = useMemo(() => {
-    const levels = new Map<string, 0 | 1 | 2>();
-    const counts = new Map<string, number>();
-    for (const [path, info] of impact.files) {
-      levels.set(path, info.level);
-      if (info.findings.length > 0) counts.set(path, info.findings.length);
-    }
-    // 영향이 전달되는 파일 쌍: 한 단계 바깥 파일이 안쪽 파일을 쓴다
-    const links: CityImpact["links"] = [];
-    for (const e of data.edges) {
-      const a = levels.get(e.source);
-      const b = levels.get(e.target);
-      if (a !== undefined && b !== undefined && a === b + 1 && a > 0) links.push({ from: e.source, to: e.target, level: a as 1 | 2 });
-    }
-    return { levels, reveal, findings: counts, links };
-  }, [impact, data.edges, reveal]);
 
   // 파일 단위 목록 (단계별) + 그 파일이 왜 영향을 받는지 (그 파일 함수의 첫 이유)
   const byLevel = useMemo(() => {
@@ -76,7 +51,7 @@ export function ImpactCityView({ data, context, findings, title, subtitle, backH
         </Link>
         <span className="gx-sub">{subtitle}</span>
         <div className="ins-actions">
-          <button onClick={() => setRound((r) => r + 1)}>↺ 다시 재생</button>
+          <button onClick={replay}>↺ 다시 재생</button>
           <Link href={impact2dHref}>2D 영향 그래프</Link>
         </div>
       </header>
@@ -90,7 +65,7 @@ export function ImpactCityView({ data, context, findings, title, subtitle, backH
               </span>
             ))}
           </div>
-          <CodeCity insights={insights} mode="group" selected={selected} onSelect={setSelected} impact={cityImpact} />
+          <CodeCity insights={insights} mode="structure" selected={selected} onSelect={setSelected} impact={cityImpact} />
         </div>
         <aside className="gx-panel">
           {header && <section className="gx-impact-head">{header}</section>}

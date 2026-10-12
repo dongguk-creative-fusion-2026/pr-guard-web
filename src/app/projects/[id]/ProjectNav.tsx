@@ -20,11 +20,11 @@ export function ProjectNav({ id }: { id: number }) {
   const base = `/projects/${id}`;
   const section = sectionOf(path, base);
   const rest = path.slice(base.length);
-  const tab = params.get("tab") ?? "graph";
+  const tab = params.get("tab") ?? "city";
 
   const commitTabs = [
-    { href: `${base}/commits`, label: "커밋 그래프", active: /^\/commits/.test(rest) && tab === "graph" },
-    { href: `${base}/commits?tab=city`, label: "코드 시티", active: /^\/(commits|insights)/.test(rest) && tab === "city" },
+    { href: `${base}/commits`, label: "코드 시티", active: /^\/(commits|insights)/.test(rest) && tab === "city" },
+    { href: `${base}/commits?tab=graph`, label: "커밋 그래프", active: /^\/commits/.test(rest) && tab === "graph" },
     { href: `${base}/commits?tab=hotspots`, label: "핫스팟", active: /^\/(commits|insights)/.test(rest) && tab === "hotspots" },
     { href: `${base}/commits?tab=coupling`, label: "숨은 결합", active: /^\/(commits|insights)/.test(rest) && tab === "coupling" },
     { href: `${base}/graph`, label: "코드 그래프", active: rest.startsWith("/graph") },

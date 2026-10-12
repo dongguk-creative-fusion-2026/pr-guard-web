@@ -15,7 +15,7 @@ const TABS: InsightTab[] = ["city", "hotspots", "coupling"];
 const MODES: CityColorMode[] = ["structure", "hotspot", "group", "recent", "test", "runtime", "delegation"];
 
 /**
- * 커밋 이력: 첫 화면은 커밋 그래프(브랜치 갈래 · 병합). ?tab=city 는 코드 시티 + 시간 여행,
+ * 커밋 이력: 첫 화면은 코드 시티 + 시간 여행. ?tab=graph 는 커밋 그래프(브랜치 갈래 · 병합),
  * hotspots · coupling 은 핫스팟 · 숨은 결합. 코드 시티 색 기준은 ?mode=.
  */
 export default async function CommitsPage({
@@ -47,7 +47,7 @@ export default async function CommitsPage({
       </main>
     );
   }
-  if (!tab || tab === "graph") {
+  if (tab === "graph") {
     if (!graph.graph.commitGraph) {
       return (
         <main>

@@ -292,6 +292,7 @@ export function CodeCity({
   onSelectInfra,
   runtime,
   delegation,
+  embedded = false,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -307,6 +308,8 @@ export function CodeCity({
   runtime?: FileRuntime | null;
   /** AI 위임 모드: 파일별 구역 */
   delegation?: Delegation | null;
+  /** 페이지 안에 작게 넣을 때: 휠로 확대하지 않는다 (페이지 스크롤을 뺏지 않게) */
+  embedded?: boolean;
 }) {
   const live = mode === "runtime" && runtime ? runtime : null;
   const liveHeat = (n: number) => (live ? Math.log(1 + n) / Math.log(1 + live.maxCalls) : 0);
@@ -450,7 +453,7 @@ export function CodeCity({
         shadows={{ type: PCFShadowMap }}
         dpr={[1, 2]}
         // 인프라 층이 있으면 도시 둘레까지 보이게 조금 더 멀리서 시작한다
-        camera={{ position: infra ? [size * 0.85, size * 1.35, size * 1.6] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
+        camera={{ position: infra ? [size * 0.85, size * 1.35, size * 1.6] : embedded ? [size * 0.62, size * 0.98, size * 0.9] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
         onPointerMissed={() => {
           onSelect(null);
           onSelectInfra?.(null);
@@ -526,8 +529,9 @@ export function CodeCity({
         <OrbitControls
           makeDefault
           // 인프라 층(앞 · 왼쪽 입구)까지 화면 가운데에 오게 중심을 옮긴다
-          target={infra ? [-size * 0.16, 0, size * 0.12] : [0, 0, 0]}
+          target={infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [0, 0, 0]}
           enableDamping
+          enableZoom={!embedded}
           autoRotate={rotate}
           autoRotateSpeed={0.35}
           maxPolarAngle={Math.PI / 2.15}
