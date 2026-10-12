@@ -196,6 +196,8 @@ export type GraphData = {
   calls?: { source: string; target: string; weight: number }[];
   /** 최근 커밋(최대 1000개) 기준 git 이력. 예전 그래프에는 없다 */
   history?: GitHistory | null;
+  /** 모든 브랜치의 최근 커밋 (최신 → 오래된, topo-order). 브랜치 갈래 · 병합을 그린다. 예전 그래프에는 없다 */
+  commitGraph?: CommitGraph | null;
   /** 인프라 지도. 예전 그래프에는 없다 */
   infra?: InfraMap | null;
   stats: {
@@ -264,6 +266,14 @@ export type GitHistory = {
   }[];
   timelineFiles?: string[];
   authors?: string[];
+};
+
+export type CommitGraph = {
+  /** 기본 브랜치 이름 */
+  head: string;
+  authors: string[];
+  /** h = 해시 앞 12자리, p = 부모 해시들, a = authors 번호, at = 초 단위 시각, m = 제목, refs = 이 커밋을 가리키는 브랜치 */
+  commits: { h: string; p: string[]; a: number; at: number; m: string; refs?: string[] }[];
 };
 
 export type RepoGraph = {
