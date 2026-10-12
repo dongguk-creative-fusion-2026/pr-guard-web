@@ -1,25 +1,24 @@
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 import { api, ApiError, type Project } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
+import { formatTime, timeAgo } from "@/lib/format";
 import { buildQueue, LANE_META, LANES, type Lane, type QueueStats } from "@/lib/queue";
 import { summarizeStack } from "@/lib/stack";
-import { Logo } from "@/components/Logo";
 import { RegisterForm } from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
 
-type Card = {
+type Row = {
   project: Project;
   stats: QueueStats | null;
   lanes: Record<Lane, number> | null;
   stack: ReturnType<typeof summarizeStack>;
 };
 
-/** 레포 이름으로 고정된 색 (카드 앞 표식) */
-function hue(name: string): number {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
+/** 0 은 흐린 대시로: 숫자가 있는 칸만 눈에 들어오게 */
+function Num({ value, tone }: { value: number | null | undefined; tone?: "warn" | "ok" }) {
+  if (!value) return <span className="pl-zero">–</span>;
+  return <span className={tone ? `t-${tone}` : undefined}>{value}</span>;
 }
 
 export default async function Home() {
@@ -30,10 +29,9 @@ export default async function Home() {
   } catch (e) {
     error = e instanceof ApiError ? e.message : "프로젝트 목록을 불러오지 못했습니다";
   }
-  // 카드마다 대기열 숫자를 같이 보여 준다. 한 프로젝트가 실패해도 나머지는 그린다
-  const cards: Card[] = await Promise.all(
+  // 행마다 대기열 숫자와 레포 구성. 한 프로젝트가 실패해도 나머지는 그린다
+  const rows: Row[] = await Promise.all(
     projects.map(async (project) => {
-      // 레포 구성(언어 · 인프라)은 없어도 카드는 그린다
       const [repo, graph] = await Promise.all([
         api.getRepoInfo(project.id).catch(() => null),
         api.getGraph(project.id).catch(() => null),
@@ -66,62 +64,59 @@ export default async function Home() {
         </div>
         {error && <p className="error">{error}</p>}
 
-        <div className="pgrid">
-          {cards.map(({ project: p, stats, lanes, stack }) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="pc" style={{ ["--h" as string]: hue(p.name) }}>
-              <div className="pc-top">
-                <span className="pc-mark">{p.name.slice(0, 1).toUpperCase()}</span>
-                <div className="pc-name">
-                  <b>{p.name}</b>
-                  <span>{p.owner}</span>
-                </div>
-                <span className={`pc-live${p.lastPollError ? " err" : ""}`} title={p.lastPollError ?? "정상"} />
-              </div>
-              {(stack.languages.length > 0 || stack.parts.length > 0) && (
-                <div className="pc-stack">
-                  {stack.languages.map((l) => (
-                    <span key={l.name} className="pc-lang">
-                      <i style={{ background: l.color }} />
-                      {l.name}
-                      <em>{l.pct}%</em>
-                    </span>
-                  ))}
-                  {stack.parts.map((part) => (
-                    <span key={part.label} className={`pc-part ${part.kind}`}>
-                      {part.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="pc-stats">
-                <div>
-                  <b>{stats?.open ?? p.openPullCount}</b>
-                  <span>열린 PR</span>
-                </div>
-                <div>
-                  <b className={stats && stats.human > 0 ? "warn" : ""}>{stats?.human ?? "-"}</b>
-                  <span>볼 PR</span>
-                </div>
-                <div>
-                  <b className={stats && stats.pass > 0 ? "ok" : ""}>{stats?.pass ?? "-"}</b>
-                  <span>자동 통과</span>
-                </div>
-              </div>
-              <div className="pc-bar">
-                {lanes && (stats?.open ?? 0) > 0 ? (
-                  LANES.map((l) => (lanes[l] > 0 ? <i key={l} style={{ flex: lanes[l], background: LANE_META[l].color }} title={`${LANE_META[l].label} ${lanes[l]}`} /> : null))
-                ) : (
-                  <i style={{ flex: 1 }} />
-                )}
-              </div>
-              <div className="pc-foot">
-                <span>{timeAgo(p.lastPolledAt)}</span>
-                <span className="pc-go">→</span>
-              </div>
-            </Link>
-          ))}
-          {!error && projects.length === 0 && <div className="pc pc-empty">첫 레포를 추가하세요</div>}
-        </div>
+        {projects.length > 0 && (
+          <div className="pl" role="table">
+            <div className="pl-row pl-header" role="row">
+              <span>레포</span>
+              <span>구성</span>
+              <span className="pl-n">열린 PR</span>
+              <span className="pl-n">볼 PR</span>
+              <span className="pl-n">자동 통과</span>
+              <span>판정 분포</span>
+              <span className="pl-n">확인</span>
+            </div>
+            {rows.map(({ project: p, stats, lanes, stack }) => {
+              const langs = stack.languages.map((l) => l.name);
+              const parts = stack.parts.map((x) => x.label);
+              const all = [...langs, ...parts];
+              return (
+                <Link key={p.id} href={`/projects/${p.id}`} className="pl-row" role="row">
+                  <span className="pl-name">
+                    <b>{p.name}</b>
+                    <small>{p.owner}</small>
+                  </span>
+                  <span className="pl-stack" title={all.join(" · ")}>
+                    {langs.length > 0 && <span className="pl-langs">{langs.join(" · ")}</span>}
+                    {parts.length > 0 && <span className="pl-parts">{parts.join(" · ")}</span>}
+                    {all.length === 0 && <span className="pl-zero">–</span>}
+                  </span>
+                  <span className="pl-n">
+                    <Num value={stats?.open ?? p.openPullCount} />
+                  </span>
+                  <span className="pl-n">
+                    <Num value={stats?.human} tone="warn" />
+                  </span>
+                  <span className="pl-n">
+                    <Num value={stats?.pass} tone="ok" />
+                  </span>
+                  <span className="pl-bar">
+                    {lanes && (stats?.open ?? 0) > 0 ? (
+                      LANES.map((l) =>
+                        lanes[l] > 0 ? <i key={l} style={{ flex: lanes[l], background: LANE_META[l].color }} title={`${LANE_META[l].label} ${lanes[l]}`} /> : null,
+                      )
+                    ) : (
+                      <i className="empty" />
+                    )}
+                  </span>
+                  <span className={`pl-n pl-time${p.lastPollError ? " err" : ""}`} title={p.lastPollError ?? formatTime(p.lastPolledAt)}>
+                    {p.lastPollError ? "오류" : timeAgo(p.lastPolledAt)}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+        {!error && projects.length === 0 && <p className="pl-empty">첫 레포를 추가하세요</p>}
       </main>
     </>
   );
