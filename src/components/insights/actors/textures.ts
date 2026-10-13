@@ -75,3 +75,26 @@ export function labelTexture(text: string, color: string): CanvasTexture {
   tex.colorSpace = SRGBColorSpace;
   return tex;
 }
+
+/** 3D 이름표용 글자 (투명 배경, 가로로 긴 판) */
+export function textTexture(text: string, color: string): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 96;
+  const g = canvas.getContext("2d")!;
+  g.font = "700 52px 'Noto Sans KR', 'Malgun Gothic', sans-serif";
+  g.textBaseline = "middle";
+  g.fillStyle = "rgba(10, 10, 14, 0.75)";
+  const w = Math.min(500, g.measureText(text).width + 40);
+  g.beginPath();
+  g.roundRect(4, 8, w, 80, 14);
+  g.fill();
+  g.strokeStyle = color;
+  g.lineWidth = 3;
+  g.stroke();
+  g.fillStyle = color;
+  g.fillText(text, 24, 50);
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}

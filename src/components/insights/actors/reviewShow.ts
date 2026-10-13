@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Finding, GroundStatus, Verdict } from "@/lib/api";
+import type { Finding, GroundLayerId, GroundMark, GroundStatus, Verdict } from "@/lib/api";
+import { groundingOf } from "@/lib/grounding";
 import type { ReviewEvent, StageId } from "@/components/pipeline/stages";
 import { usePipelineEvents } from "@/components/pipeline/usePipelineEvents";
 
@@ -11,6 +12,9 @@ export type ShowPhase = "collect" | "scan" | "impact" | "threat" | "ground" | "v
 /** 보안 위협: 보안 검사나 AI 가 보안 문제라고 한 지적 */
 export type ShowThreat = { file: string; title: string; status: GroundStatus | null };
 
+/** 근거 확인 결과: 지적 하나가 층마다 어떻게 확인됐나 */
+export type ShowGrounded = { file: string; title: string; status: GroundStatus; layers: { layer: GroundLayerId; mark: GroundMark }[] };
+
 export type ShowState = {
   phase: ShowPhase | null;
   /** 이번 PR 이 바꾼 파일 */
@@ -18,6 +22,7 @@ export type ShowState = {
   /** 바뀐 메서드를 부르는 파일 (바뀐 파일 제외) */
   impacted: string[];
   threats: ShowThreat[];
+  grounded: ShowGrounded[];
   verdict: Verdict | null;
   /** 지금 장면에서 몇 ms 지났는지 (훑기 순서 계산용) */
   elapsed: number;
@@ -33,7 +38,7 @@ const MIN_MS: Record<Exclude<ShowPhase, "verdict" | "failed">, number> = {
   scan: 0, // 바뀐 파일 수에 따라 (SCAN_PER_FILE)
   impact: 2000,
   threat: 3200,
-  ground: 2600,
+  ground: 5600,
 };
 export const SCAN_PER_FILE = 1100;
 const MAX_SCAN = 5;
@@ -81,8 +86,26 @@ function material(events: ReviewEvent[], props: { changed: string[]; findings: F
     }
   }
 
+  // 근거 확인: 지적마다 층별 표시. 확인 → AI 만 → 뺀 지적 순
+  const grounded: ShowGrounded[] = [];
+  if (props.findings) {
+    for (const f of props.findings) {
+      if (!f.file) continue;
+      const g = groundingOf(f);
+      grounded.push({ file: f.file, title: f.title, status: g.status, layers: g.layers.map(({ layer, mark }) => ({ layer, mark })) });
+    }
+  } else {
+    for (const f of (done.get("GROUND")?.data?.findings as (RawFinding & { layers?: { layer: GroundLayerId; mark: GroundMark }[] })[] | undefined) ?? []) {
+      if (!f.file || !f.title || !f.layers) continue;
+      grounded.push({ file: f.file, title: f.title, status: (f.status as GroundStatus) ?? "AI_ONLY", layers: f.layers.map(({ layer, mark }) => ({ layer, mark })) });
+    }
+  }
+  const rank: Record<GroundStatus, number> = { CONFIRMED: 0, AI_ONLY: 1, REFUTED: 2 };
+  grounded.sort((a, b) => rank[a.status] - rank[b.status]);
+
   return {
     done,
+    grounded: grounded.slice(0, 6),
     changed: changed.slice(0, 40),
     impacted: [...impacted].slice(0, 40),
     threats: [...threats.values()].slice(0, 4),
@@ -160,12 +183,15 @@ export function useReviewShow({
   changed = [],
   findings = null,
   round = 0,
+  impactHold = 0,
 }: {
   reviewId: number | null;
   prNumber: number;
   changed?: string[];
   findings?: Finding[] | null;
   round?: number;
+  /** 영향 장면을 더 오래 보여 줄 시간 (숨은 결합이 있을 때) */
+  impactHold?: number;
 }): ShowState {
   const { events, ended } = usePipelineEvents(reviewId ?? -1, reviewId !== null);
   const m = useMemo(() => material(events, { changed, findings }), [events, changed, findings]);
@@ -173,6 +199,8 @@ export function useReviewShow({
   const [now, setNow] = useState(() => Date.now());
   const mRef = useRef(m);
   mRef.current = m;
+  const holdRef = useRef(impactHold);
+  holdRef.current = impactHold;
 
   useEffect(() => setStep({ index: -1, since: Date.now() }), [reviewId, round]);
 
@@ -184,7 +212,7 @@ export function useReviewShow({
       setStep((s) => {
         const mat = mRef.current;
         const current = ORDER[s.index];
-        const min = current === undefined ? 0 : current === "scan" ? Math.min(mat.changed.length, MAX_SCAN) * SCAN_PER_FILE + 400 : current === "verdict" ? Infinity : MIN_MS[current as keyof typeof MIN_MS];
+        const min = current === undefined ? 0 : current === "scan" ? Math.min(mat.changed.length, MAX_SCAN) * SCAN_PER_FILE + 400 : current === "verdict" ? Infinity : MIN_MS[current as keyof typeof MIN_MS] + (current === "impact" ? holdRef.current : 0);
         if (t - s.since < min) return s;
         for (let i = s.index + 1; i < ORDER.length; i++) {
           const next = ORDER[i];
@@ -208,6 +236,7 @@ export function useReviewShow({
     changed: m.changed,
     impacted: m.impacted,
     threats: m.threats,
+    grounded: m.grounded,
     verdict: m.verdict,
     elapsed,
     caption: phase ? captionOf(phase, m, elapsed, prNumber) : "",

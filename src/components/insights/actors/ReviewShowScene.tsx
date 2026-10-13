@@ -7,15 +7,19 @@ import { GROUND, type Building, type CityImpact } from "../CodeCity";
 import { AiRobot } from "./AiRobot";
 import { AttackBeam, ScanBeam, Shield } from "./effects";
 import { Hacker, HACKER_HANDS } from "./Hacker";
+import type { HiddenPartner } from "./hiddenCoupling";
+import { CouplingCables, GroundStack } from "./layersFx";
 import { SCAN_PER_FILE, type ShowState, type ShowThreat } from "./reviewShow";
 
 const SHIELD_COLOR = { CONFIRMED: "#38e1ff", AI_ONLY: "#facc15" } as const;
 
 /** 장면에 맞춰 건물을 칠한다: 바뀐 파일(0) → 영향받는 파일(1). 위협 파일에는 지적 수 */
-export function showImpact(show: ShowState, known?: Map<string, unknown>): CityImpact | null {
+export function showImpact(show: ShowState, known?: Map<string, unknown>, partners: HiddenPartner[] = []): CityImpact | null {
   if (!show.phase) return null;
   const levels = new Map<string, 0 | 1 | 2>();
   const at = (f: string) => (known ? (locatePath(f, known) ?? f) : f);
+  // 숨은 결합의 짝(안 바뀐 쪽)은 영향 추적부터 주황으로
+  if (show.phase !== "collect" && show.phase !== "scan") for (const p of partners) levels.set(p.partner, 2);
   for (const f of show.impacted) levels.set(at(f), 1);
   for (const f of show.changed) levels.set(at(f), 0);
   const findings = new Map<string, number>();
@@ -77,8 +81,10 @@ export function ReviewShowScene({
   size,
   byPath,
   hackerX = -0.85,
+  partners = [],
 }: {
   show: ShowState;
+  partners?: HiddenPartner[];
   size: number;
   byPath: Map<string, Building>;
   /** 해커가 뜰 가로 위치 (도시 크기 비율). 오른쪽 패널이 있으면 왼쪽으로 */
@@ -103,6 +109,11 @@ export function ReviewShowScene({
     .filter((x): x is { threat: ShowThreat; b: Building } => !!x.b);
   const live = threats.filter((x) => x.threat.status !== "REFUTED");
 
+  // 근거 층: 가장 높은 건물 위에서 네 층이 떠오른다
+  const maxRoof = Math.max(...[...byPath.values()].map(topOf), size * 0.1);
+  const stackBase = maxRoof + size * 0.08;
+  const stackTop = stackBase + size * 0.075 * 3;
+
   // 로봇이 갈 곳과 비출 건물
   let robot: [number, number, number] = [0, size * 0.32, 0];
   let beam: { b: Building; radius: number } | null = null;
@@ -113,10 +124,14 @@ export function ReviewShowScene({
   } else if (phase === "impact") {
     const all = [...changed, ...buildingsOf(show.impacted)];
     robot = centroid(all);
-  } else if ((phase === "threat" || phase === "ground" || phase === "verdict") && (live[0] ?? threats[0])) {
+  } else if (phase === "ground") {
+    // 층 맨 위에서 내려다본다
+    const focus = (live[0] ?? threats[0])?.b;
+    robot = focus ? [focus.x, stackTop + size * 0.1, focus.z] : [0, stackTop + size * 0.1, 0];
+  } else if ((phase === "threat" || phase === "verdict") && (live[0] ?? threats[0])) {
     const b = (live[0] ?? threats[0]).b;
     robot = [b.x, topOf(b) + hover, b.z];
-    if (phase !== "verdict") beam = { b, radius: Math.max(b.w, b.d) * 0.8 };
+    if (phase === "threat") beam = { b, radius: Math.max(b.w, b.d) * 0.8 };
   } else if (changed.length > 0) {
     robot = centroid(changed);
   }
@@ -172,6 +187,10 @@ export function ReviewShowScene({
           color={SHIELD_COLOR[threat.status === "CONFIRMED" ? "CONFIRMED" : "AI_ONLY"]}
         />
       ))}
+      {(phase === "impact" || phase === "threat" || phase === "ground") && <CouplingCables partners={partners} byPath={byPath} size={size} />}
+      {phase === "ground" && (
+        <GroundStack size={size} byPath={byPath} grounded={show.grounded} elapsed={show.elapsed} locate={locate} roofOf={topOf} base={stackBase} />
+      )}
       <FlyingRobot target={robot} scale={robotScale} />
       {beam && (
         <ScanBeam
