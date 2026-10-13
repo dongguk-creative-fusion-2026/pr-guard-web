@@ -37,21 +37,31 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
   const [hovered, setHovered] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [round, setRound] = useState(0);
-  const active = !!show && (show.live || playing);
+  // 실시간으로 보기 시작한 리뷰는 끝나서 목록이 바뀌어도 닫을 때까지 붙잡아 둔다
+  const [pinned, setPinned] = useState<EntryShow | null>(null);
+  useEffect(() => {
+    if (show?.live && pinned?.reviewId !== show.reviewId) setPinned(show);
+  }, [show, pinned]);
+  const current = pinned ?? (playing ? show : null);
+  const active = !!current;
   const state = useReviewShow({
-    reviewId: active ? show.reviewId : null,
-    prNumber: show?.number ?? 0,
-    changed: show?.changed,
-    findings: show?.findings,
+    reviewId: current?.reviewId ?? null,
+    prNumber: current?.number ?? 0,
+    changed: current?.changed,
+    findings: current?.findings,
     round,
   });
+  const close = () => {
+    setPinned(null);
+    setPlaying(false);
+  };
 
-  // 진행 중인 리뷰가 생기거나 끝나면 알 수 있게 주기적으로 다시 불러온다 (장면을 보는 중에는 멈춘다)
+  // 진행 중인 리뷰가 생기는지 주기적으로 다시 불러온다 (장면을 보는 중에는 멈춘다)
   useEffect(() => {
-    if (playing) return;
+    if (active) return;
     const timer = setInterval(() => router.refresh(), REFRESH_MS);
     return () => clearInterval(timer);
-  }, [playing, router]);
+  }, [active, router]);
 
   // 파일 → 그 파일을 건드린 PR 들 (marks 는 급한 순이라 첫 PR 색을 쓴다)
   const byFile = useMemo(() => {
@@ -85,13 +95,13 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
         wide={active}
         scene={active ? (city) => <ReviewShowScene show={state} {...city} /> : undefined}
       />
-      {active && show && (
+      {current && (
         <div className="en-show">
-          <ShowCaption show={state} title={`PR #${show.number} ${show.title}`} />
+          <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} />
           <div className="en-show-actions">
-            {!show.live && <button onClick={() => setRound((r) => r + 1)}>다시 재생</button>}
-            <button onClick={() => router.push(`/projects/${projectId}/prs/${show.number}`)}>PR 판단 보기</button>
-            {!show.live && <button onClick={() => setPlaying(false)}>닫기</button>}
+            {!state.live && <button onClick={() => setRound((r) => r + 1)}>다시 재생</button>}
+            <button onClick={() => router.push(`/projects/${projectId}/prs/${current.number}`)}>PR 판단 보기</button>
+            {!state.live && <button onClick={close}>닫기</button>}
           </div>
         </div>
       )}
