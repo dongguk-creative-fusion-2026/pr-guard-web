@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { GraphData } from "@/lib/api";
+import { ActorsPreview } from "./actors/ActorsPreview";
 import { CodeCity } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -13,7 +14,7 @@ export type EntryMark = { number: number; title: string; color: string; files: s
  * 프로젝트 입구의 바닥 층: 프로젝트 구조대로 지은 코드 시티 위에 사람이 볼 PR 이 건드린 건물을 판정 색으로 세운다.
  * 표시된 건물을 누르면 그 PR, 나머지는 코드 시티에서 그 파일
  */
-export function EntryCity({ data, projectId, marks }: { data: GraphData; projectId: number; marks: EntryMark[] }) {
+export function EntryCity({ data, projectId, marks, preview = false }: { data: GraphData; projectId: number; marks: EntryMark[]; preview?: boolean }) {
   const router = useRouter();
   const insights = useMemo(() => computeInsights(data), [data]);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -43,6 +44,8 @@ export function EntryCity({ data, projectId, marks }: { data: GraphData; project
         marks={cityMarks}
         onHover={setHovered}
         shift={0.22}
+        wide={preview}
+        scene={preview ? (city) => <ActorsPreview {...city} /> : undefined}
       />
       {hovered && (
         <div className="en-hover">

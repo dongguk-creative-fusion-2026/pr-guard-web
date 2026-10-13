@@ -21,8 +21,15 @@ const MARK_LIMIT = 12;
  * 프로젝트 입구: 바닥에 프로젝트 구조대로 지은 코드 시티를 깔고, 사람이 볼 PR 이 건드린 건물을 판정 색으로 세운다.
  * 그 위 오른쪽에 PR 이력 · 커밋 이력 두 갈래 (숫자 한 줄과 지금 볼 것 몇 개)
  */
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ actors?: string }>;
+}) {
   const id = Number((await params).id);
+  const preview = (await searchParams).actors === "1";
   if (!Number.isInteger(id)) notFound();
 
   let data;
@@ -54,7 +61,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     <main className={city ? "en en-stage" : "en"}>
       {city && (
         <div className="en-city">
-          <EntryCityClient data={city} projectId={id} marks={marks} />
+          <EntryCityClient data={city} projectId={id} marks={marks} preview={preview} />
           <div className="en-legend">
             <span>
               <i style={{ background: MARK_COLOR.BLOCKED }} />
