@@ -2,7 +2,7 @@
 
 import { Edges, Html, OrbitControls, QuadraticBezierLine } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { PCFShadowMap, Vector3, type Mesh, type MeshStandardMaterial } from "three";
 import type { InfraMap } from "@/lib/api";
 import { ZONE_META, type Delegation } from "@/lib/delegation";
@@ -23,7 +23,7 @@ export type CityImpact = {
   links: { from: string; to: string; level: 1 | 2 }[];
 };
 
-type Building = {
+export type Building = {
   file: FileMetric;
   x: number;
   z: number;
@@ -35,7 +35,7 @@ type Building = {
 type Plate = { label: string; x: number; z: number; w: number; d: number };
 type District = Plate & { color: string; count: number; blocks: Plate[] };
 
-const GROUND = 0.6;
+export const GROUND = 0.6;
 const DIM = "#1c1d2e";
 export const LEVEL_COLORS = ["#fde047", "#f43f5e", "#fb923c"] as const;
 const OUT_COLOR = "#22d3ee";
@@ -296,6 +296,8 @@ export function CodeCity({
   marks,
   onHover,
   shift = 0,
+  scene,
+  wide = false,
 }: {
   insights: Insights;
   mode: CityColorMode;
@@ -318,6 +320,10 @@ export function CodeCity({
   onHover?: (path: string | null) => void;
   /** 오른쪽에 패널이 덮을 때 도시를 왼쪽으로 옮기는 정도 (도시 크기 비율) */
   shift?: number;
+  /** 도시 위에 더 그릴 것 (캐릭터 · 연출). 건물 위치를 받아 그린다 */
+  scene?: (city: { size: number; byPath: Map<string, Building> }) => ReactNode;
+  /** 도시 뒤 하늘까지 보이게 더 낮고 멀리서 본다 (뒤에 솟는 홀로그램용) */
+  wide?: boolean;
 }) {
   const live = mode === "runtime" && runtime ? runtime : null;
   const liveHeat = (n: number) => (live ? Math.log(1 + n) / Math.log(1 + live.maxCalls) : 0);
@@ -467,7 +473,7 @@ export function CodeCity({
         shadows={{ type: PCFShadowMap }}
         dpr={[1, 2]}
         // 인프라 층이 있으면 도시 둘레까지 보이게 조금 더 멀리서 시작한다
-        camera={{ position: infra ? [size * 0.85, size * 1.35, size * 1.6] : embedded ? [size * 0.62, size * 0.98, size * 0.9] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
+        camera={{ position: wide ? [size * 0.55, size * 0.5, size * 1.85] : infra ? [size * 0.85, size * 1.35, size * 1.6] : embedded ? [size * 0.62, size * 0.98, size * 0.9] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
         onPointerMissed={() => {
           onSelect(null);
           onSelectInfra?.(null);
@@ -490,7 +496,7 @@ export function CodeCity({
         <pointLight position={[-size * 0.5, size * 0.4, -size * 0.5]} intensity={size * 3} color="#6366f1" distance={size * 2} />
 
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[size * 4, size * 4]} />
+          <planeGeometry args={wide ? [size * 16, size * 16] : [size * 4, size * 4]} />
           <meshStandardMaterial color="#0a0a14" roughness={1} />
         </mesh>
         <gridHelper args={[size * 4, 80, "#1b1b2e", "#12121f"]} position={[0, 0.01, 0]} />
@@ -543,7 +549,7 @@ export function CodeCity({
         <OrbitControls
           makeDefault
           // 인프라 층(앞 · 왼쪽 입구)까지 화면 가운데에 오게 중심을 옮긴다
-          target={infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [size * shift, 0, 0]}
+          target={wide ? [size * shift, size * 0.4, -size * 0.3] : infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [size * shift, 0, 0]}
           enableDamping
           enableZoom={!embedded}
           autoRotate={rotate}
@@ -553,6 +559,7 @@ export function CodeCity({
           maxDistance={size * 3}
           onStart={() => setRotate(false)}
         />
+        {scene?.({ size, byPath })}
         <LabelProjector labels={labels} els={labelEls} />
       </Canvas>
       <div className="city-labels" aria-hidden="true">
