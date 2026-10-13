@@ -7,6 +7,7 @@ import { ReviewShowScene, showImpact } from "./actors/ReviewShowScene";
 import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
 import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
+import { archNote } from "./actors/archNote";
 import { CodeCity, LEVEL_COLORS } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -65,7 +66,7 @@ export function ImpactCityInline({ data, reviewId, prNumber, context, findings, 
           wide
           scene={(city) => <ReviewShowScene show={show} partners={partners} {...city} hackerX={-0.35} />}
         />
-        <ShowCaption show={show} note={show.phase === "impact" || show.phase === "threat" ? partnerNote(partners) : null} />
+        <ShowCaption show={show} note={show.phase === "impact" || show.phase === "threat" ? (archNote(show.arch) ?? partnerNote(partners)) : null} />
       </div>
     </section>
   );

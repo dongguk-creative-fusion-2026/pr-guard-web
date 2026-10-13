@@ -8,7 +8,7 @@ import { AiRobot } from "./AiRobot";
 import { AttackBeam, ScanBeam, Shield } from "./effects";
 import { Hacker, HACKER_HANDS } from "./Hacker";
 import type { HiddenPartner } from "./hiddenCoupling";
-import { CouplingCables, GroundStack } from "./layersFx";
+import { ArchBridges, CouplingCables, GroundStack } from "./layersFx";
 import { SCAN_PER_FILE, type ShowState, type ShowThreat } from "./reviewShow";
 
 const SHIELD_COLOR = { CONFIRMED: "#38e1ff", AI_ONLY: "#facc15" } as const;
@@ -188,6 +188,9 @@ export function ReviewShowScene({
         />
       ))}
       {(phase === "impact" || phase === "threat" || phase === "ground") && <CouplingCables partners={partners} byPath={byPath} size={size} />}
+      {phase !== "collect" && phase !== "scan" && phase !== "failed" && (
+        <ArchBridges arch={show.arch} byPath={byPath} size={size} locate={locate} roofOf={topOf} />
+      )}
       {phase === "ground" && (
         <GroundStack size={size} byPath={byPath} grounded={show.grounded} elapsed={show.elapsed} locate={locate} roofOf={topOf} base={stackBase} />
       )}

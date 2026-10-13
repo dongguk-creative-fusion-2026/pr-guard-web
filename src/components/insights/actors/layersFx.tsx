@@ -3,13 +3,14 @@
 import { Edges } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
+import { QuadraticBezierLine } from "@react-three/drei";
 import { AdditiveBlending, type Group, type Mesh, type MeshBasicMaterial } from "three";
 import type { GroundLayerId } from "@/lib/api";
 import { LAYER_META, LAYER_ORDER } from "@/lib/grounding";
 import type { Building } from "../CodeCity";
 import { AttackBeam } from "./effects";
 import type { HiddenPartner } from "./hiddenCoupling";
-import type { ShowGrounded } from "./reviewShow";
+import type { ShowArch, ShowGrounded } from "./reviewShow";
 import { textTexture } from "./textures";
 
 const PIN_COLOR = { CONFIRMED: "#38e1ff", AI_ONLY: "#facc15", REFUTED: "#ff4d5e" } as const;
@@ -209,5 +210,60 @@ function BlinkRing({ x, z, radius }: { x: number; z: number; radius: number }) {
       <ringGeometry args={[radius * 0.85, radius, 48]} />
       <meshBasicMaterial ref={mat} color="#fbbf24" transparent blending={AdditiveBlending} depthWrite={false} />
     </mesh>
+  );
+}
+
+const ARCH_LABEL: Record<string, string> = {
+  ARCH_LAYER_BYPASS: "계층 건너뜀",
+  ARCH_REVERSE_DEPENDENCY: "역방향 의존",
+  ARCH_NEW_MODULE_DEPENDENCY: "새 모듈 의존",
+};
+const BRIDGE = "#c084fc";
+
+/**
+ * 구조 변화 다리: 이번 PR 이 만든, 구조를 거스르는 의존을 두 건물 사이에 높이 솟은 보라 아치로 잇는다.
+ * 다리 위로 빛이 흐르고 꼭대기에 규칙 이름이 붙는다
+ */
+export function ArchBridges({
+  arch,
+  byPath,
+  size,
+  locate,
+  roofOf,
+}: {
+  arch: ShowArch[];
+  byPath: Map<string, Building>;
+  size: number;
+  locate: (file: string, byPath: Map<string, Building>) => Building | undefined;
+  roofOf: (b: Building) => number;
+}) {
+  return (
+    <group>
+      {arch.map((a) => {
+        const from = locate(a.from, byPath);
+        const to = locate(a.to, byPath);
+        if (!from || !to || from === to) return null;
+        const start: [number, number, number] = [from.x, roofOf(from), from.z];
+        const end: [number, number, number] = [to.x, roofOf(to), to.z];
+        const lift = size * 0.22 + Math.hypot(to.x - from.x, to.z - from.z) * 0.35;
+        const apex: [number, number, number] = [(start[0] + end[0]) / 2, Math.max(start[1], end[1]) + lift, (start[2] + end[2]) / 2];
+        return (
+          <group key={`${a.from}\n${a.to}`}>
+            <QuadraticBezierLine start={start} end={end} mid={apex} color={BRIDGE} lineWidth={6} transparent opacity={0.25} />
+            <AttackBeam from={start} to={end} lift={lift} color={BRIDGE} />
+            <BridgeTag text={ARCH_LABEL[a.rule] ?? "구조 변화"} position={[apex[0], apex[1] * 0.78, apex[2]]} width={size * 0.22} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function BridgeTag({ text, position, width }: { text: string; position: [number, number, number]; width: number }) {
+  const map = useMemo(() => textTexture(text, BRIDGE), [text]);
+  return (
+    <sprite position={position} scale={[width, width * 0.1875, 1]}>
+      <spriteMaterial map={map} transparent depthWrite={false} />
+    </sprite>
   );
 }
