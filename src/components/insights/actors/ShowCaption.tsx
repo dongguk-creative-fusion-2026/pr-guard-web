@@ -14,7 +14,7 @@ const STEPS: { phase: ShowPhase; label: string }[] = [
 const TONE: Record<string, string> = { MERGEABLE: "ok", NEEDS_CHANGES: "warn", NOT_RECOMMENDED: "bad" };
 
 /** 리뷰 장면 자막: 지금 무엇을 하는지 한 줄과 단계 진행 */
-export function ShowCaption({ show, title }: { show: ShowState; title?: string }) {
+export function ShowCaption({ show, title, note }: { show: ShowState; title?: string; note?: string | null }) {
   if (!show.phase) return null;
   const at = STEPS.findIndex((s) => s.phase === show.phase);
   const steps = STEPS.filter((s) => s.phase !== "threat" || show.threats.length > 0);
@@ -26,6 +26,7 @@ export function ShowCaption({ show, title }: { show: ShowState; title?: string }
         {title && <span className="show-title">{title}</span>}
       </div>
       <p className={`show-line ${tone}`}>{show.caption}</p>
+      {note && <p className="show-note">{note}</p>}
       <ol className="show-steps">
         {steps.map((s) => {
           const i = STEPS.indexOf(s);

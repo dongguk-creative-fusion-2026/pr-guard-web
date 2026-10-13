@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AnalysisContext, Finding, GraphData } from "@/lib/api";
 import { ReviewShowScene, showImpact } from "./actors/ReviewShowScene";
 import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
+import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
 import { CodeCity, LEVEL_COLORS } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -26,7 +27,10 @@ export function ImpactCityInline({ data, reviewId, prNumber, context, findings, 
   const insights = useMemo(() => computeInsights(data), [data]);
   const changed = useMemo(() => (context ? (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)) : []), [context]);
   const [round, setRound] = useState(0);
-  const show = useReviewShow({ reviewId, prNumber, changed, findings, round });
+  const [hold, setHold] = useState(0);
+  const show = useReviewShow({ reviewId, prNumber, changed, findings, round, impactHold: hold });
+  const partners = useMemo(() => hiddenPartners(show.changed, insights), [show.changed, insights]);
+  useEffect(() => setHold(partners.length > 0 ? 1800 : 0), [partners.length]);
   const counts = [show.changed.length, show.impacted.length];
 
   return (
@@ -56,12 +60,12 @@ export function ImpactCityInline({ data, reviewId, prNumber, context, findings, 
           mode="structure"
           selected={null}
           onSelect={() => {}}
-          impact={showImpact(show, insights.byPath)}
+          impact={showImpact(show, insights.byPath, partners)}
           embedded
           wide
-          scene={(city) => <ReviewShowScene show={show} {...city} hackerX={-0.35} />}
+          scene={(city) => <ReviewShowScene show={show} partners={partners} {...city} hackerX={-0.35} />}
         />
-        <ShowCaption show={show} />
+        <ShowCaption show={show} note={show.phase === "impact" || show.phase === "threat" ? partnerNote(partners) : null} />
       </div>
     </section>
   );

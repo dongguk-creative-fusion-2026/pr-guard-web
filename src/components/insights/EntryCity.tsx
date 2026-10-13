@@ -6,6 +6,7 @@ import type { Finding, GraphData } from "@/lib/api";
 import { ReviewShowScene, showImpact } from "./actors/ReviewShowScene";
 import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
+import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
 import { CodeCity } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -44,13 +45,17 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
   }, [show, pinned]);
   const current = pinned ?? (playing ? show : null);
   const active = !!current;
+  const [hold, setHold] = useState(0);
   const state = useReviewShow({
     reviewId: current?.reviewId ?? null,
     prNumber: current?.number ?? 0,
     changed: current?.changed,
     findings: current?.findings,
     round,
+    impactHold: hold,
   });
+  const partners = useMemo(() => hiddenPartners(state.changed, insights), [state.changed, insights]);
+  useEffect(() => setHold(partners.length > 0 ? 1800 : 0), [partners.length]);
   const close = () => {
     setPinned(null);
     setPlaying(false);
@@ -89,15 +94,15 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
           router.push(pr ? `/projects/${projectId}/prs/${pr.number}` : `/projects/${projectId}/commits?file=${encodeURIComponent(path)}`);
         }}
         marks={active ? null : cityMarks}
-        impact={active ? showImpact(state, insights.byPath) : null}
+        impact={active ? showImpact(state, insights.byPath, partners) : null}
         onHover={setHovered}
         shift={0.22}
         wide={active}
-        scene={active ? (city) => <ReviewShowScene show={state} {...city} /> : undefined}
+        scene={active ? (city) => <ReviewShowScene show={state} partners={partners} {...city} /> : undefined}
       />
       {current && (
         <div className="en-show">
-          <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} />
+          <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} note={state.phase === "impact" || state.phase === "threat" ? partnerNote(partners) : null} />
           <div className="en-show-actions">
             {!state.live && <button onClick={() => setRound((r) => r + 1)}>다시 재생</button>}
             <button onClick={() => router.push(`/projects/${projectId}/prs/${current.number}`)}>PR 판단 보기</button>

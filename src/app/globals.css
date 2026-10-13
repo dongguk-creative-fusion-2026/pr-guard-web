@@ -5724,6 +5724,12 @@ a.cg-ref.pr:hover {
   font-weight: 600;
   line-height: 1.45;
 }
+.show-note {
+  margin: -4px 0 10px;
+  color: #fbbf24;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .show-line.bad {
   color: #ff6b78;
 }
