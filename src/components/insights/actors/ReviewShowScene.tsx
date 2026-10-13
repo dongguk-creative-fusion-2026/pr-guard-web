@@ -56,7 +56,7 @@ function locate(file: string, byPath: Map<string, Building>): Building | undefin
 }
 
 /** 목표 위치로 부드럽게 날아가는 로봇 */
-function FlyingRobot({ target, scale }: { target: [number, number, number]; scale: number }) {
+export function FlyingRobot({ target, scale }: { target: [number, number, number]; scale: number }) {
   const group = useRef<Group>(null);
   const goal = useRef(new Vector3());
   useFrame((_, dt) => {

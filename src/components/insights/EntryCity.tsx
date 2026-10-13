@@ -7,6 +7,8 @@ import { ReviewShowScene, showImpact } from "./actors/ReviewShowScene";
 import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
 import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
+import { buildExecMock, execCaption, execMarks, useExecClock } from "./actors/execDemo";
+import { ParallelCity } from "./actors/ParallelCity";
 import { CodeCity } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -43,8 +45,13 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
   useEffect(() => {
     if (show?.live && pinned?.reviewId !== show.reviewId) setPinned(show);
   }, [show, pinned]);
+  // 실행 검증 연출 미리보기 (예시 데이터)
+  const [demo, setDemo] = useState(false);
+  const [demoRound, setDemoRound] = useState(0);
+  const mock = useMemo(() => buildExecMock(insights), [insights]);
+  const t = useExecClock(demo, demoRound);
   const current = pinned ?? (playing ? show : null);
-  const active = !!current;
+  const active = !!current || demo;
   const [hold, setHold] = useState(0);
   const state = useReviewShow({
     reviewId: current?.reviewId ?? null,
@@ -84,7 +91,7 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
     <>
       <CodeCity
         // 장면을 볼 때는 하늘까지 보이는 카메라로 새로 짓는다
-        key={active ? "show" : "city"}
+        key={demo ? "demo" : active ? "show" : "city"}
         insights={insights}
         mode="structure"
         selected={null}
@@ -93,14 +100,29 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
           const pr = byFile.get(path)?.[0];
           router.push(pr ? `/projects/${projectId}/prs/${pr.number}` : `/projects/${projectId}/commits?file=${encodeURIComponent(path)}`);
         }}
-        marks={active ? null : cityMarks}
-        impact={active ? showImpact(state, insights.byPath, partners) : null}
+        marks={demo && mock ? execMarks(mock, t) : active ? null : cityMarks}
+        impact={current && !demo ? showImpact(state, insights.byPath, partners) : null}
         onHover={setHovered}
         shift={0.22}
         wide={active}
-        scene={active ? (city) => <ReviewShowScene show={state} partners={partners} {...city} /> : undefined}
+        scene={
+          demo && mock
+            ? (city) => <ParallelCity mock={mock} t={t} {...city} />
+            : current
+              ? (city) => <ReviewShowScene show={state} partners={partners} {...city} />
+              : undefined
+        }
       />
-      {current && (
+      {demo && mock && (
+        <div className="en-show">
+          <ExecCaption caption={execCaption(mock, t)} />
+          <div className="en-show-actions">
+            <button onClick={() => setDemoRound((r) => r + 1)}>다시 재생</button>
+            <button onClick={() => setDemo(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+      {current && !demo && (
         <div className="en-show">
           <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} note={state.phase === "impact" || state.phase === "threat" ? partnerNote(partners) : null} />
           <div className="en-show-actions">
@@ -110,11 +132,21 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
           </div>
         </div>
       )}
-      {!active && show && (
-        <button className="en-play" onClick={() => setPlaying(true)}>
-          <i />
-          PR #{show.number} 리뷰 다시 보기
-        </button>
+      {!active && (show || mock) && (
+        <div className="en-plays">
+          {show && (
+            <button className="en-play" onClick={() => setPlaying(true)}>
+              <i />
+              PR #{show.number} 리뷰 다시 보기
+            </button>
+          )}
+          {mock && (
+            <button className="en-play" onClick={() => setDemo(true)}>
+              <i />
+              실행 검증 미리보기 <span className="en-play-tag">예시</span>
+            </button>
+          )}
+        </div>
       )}
       {hovered && !active && (
         <div className="en-hover">
@@ -128,5 +160,27 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
         </div>
       )}
     </>
+  );
+}
+
+const EXEC_STEPS = ["빌드", "테스트 실행", "차등 비교", "판정"];
+
+/** 실행 검증 연출 자막: 예시 데이터임을 늘 밝힌다 */
+function ExecCaption({ caption }: { caption: { line: string; tone: string; step: number } }) {
+  return (
+    <div className="show-cap">
+      <div className="show-cap-head">
+        <span className="show-mock">예시 데이터</span>
+        <span className="show-title">실행 검증 · PR 전과 후의 테스트를 실제로 돌려 비교</span>
+      </div>
+      <p className={`show-line ${caption.tone}`}>{caption.line}</p>
+      <ol className="show-steps">
+        {EXEC_STEPS.map((label, i) => (
+          <li key={label} className={i < caption.step ? "done" : i === caption.step ? "now" : ""}>
+            {label}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
