@@ -20,7 +20,12 @@ export type Project = {
   majorThreshold: number | null;
   /** 등록 화면(온보딩)을 끝낸 시각. null 이면 아직 */
   onboardedAt: string | null;
+  /** 실행 검증: PR 마다 base · head 테스트를 실제로 돌린다 (예전 백엔드에는 없다) */
+  execEnabled?: boolean;
 };
+
+/** 서버의 실행 환경 (쿠버네티스 · docker) 연결 상태 */
+export type ExecutionInfo = { available: boolean; runner: string };
 
 /** GitHub 레포 정보 (등록 화면) */
 export type RepoInfo = {
@@ -393,11 +398,13 @@ export const api = {
     }),
   rebuildGraph: (id: number) => call<RepoGraph>(`/api/projects/${id}/graph`, { method: "POST" }),
   getRepoInfo: (id: number) => call<RepoInfo>(`/api/projects/${id}/repo`),
-  updateSettings: (id: number, commentEnabled: boolean, majorThreshold: number | null) =>
+  updateSettings: (id: number, commentEnabled: boolean, majorThreshold: number | null, execEnabled: boolean) =>
     call<Project>(`/api/projects/${id}/settings`, {
       method: "PATCH",
-      body: JSON.stringify({ commentEnabled, majorThreshold }),
+      body: JSON.stringify({ commentEnabled, majorThreshold, execEnabled }),
     }),
+  /** 백엔드가 지원하지 않으면 null */
+  getExecution: () => call<ExecutionInfo>(`/api/execution`).catch(() => null),
   finishOnboarding: (id: number) => call<Project>(`/api/projects/${id}/onboarded`, { method: "POST" }),
   /** 런타임 기록이 없거나 백엔드가 아직 지원하지 않으면 null */
   getRuntime: (id: number) =>

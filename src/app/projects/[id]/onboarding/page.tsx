@@ -19,12 +19,12 @@ export default async function OnboardingPage({
 
   let data;
   try {
-    data = await Promise.all([api.getProject(id), api.getGraph(id), api.listPulls(id), api.listReviews(id, 20)]);
+    data = await Promise.all([api.getProject(id), api.getGraph(id), api.listPulls(id), api.listReviews(id, 20), api.getExecution()]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const [project, graph, pulls, reviews] = data;
+  const [project, graph, pulls, reviews, execution] = data;
   // GitHub 정보는 못 가져와도 온보딩은 계속한다 (rate limit 등)
   let repo: RepoInfo | null = null;
   try {
@@ -34,7 +34,7 @@ export default async function OnboardingPage({
   }
   return (
     <main>
-      <Onboarding project={project} graph={graph} repo={repo} pulls={pulls} reviews={reviews} initialStep={step} />
+      <Onboarding project={project} graph={graph} repo={repo} pulls={pulls} reviews={reviews} initialStep={step} execution={execution} />
     </main>
   );
 }

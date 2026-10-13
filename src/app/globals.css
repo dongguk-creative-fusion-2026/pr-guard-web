@@ -5851,3 +5851,7 @@ a.cg-ref.pr:hover {
   margin-bottom: 8px;
   font-size: 13px;
 }
+.ob-dim {
+  color: var(--muted);
+  font-size: 12px;
+}

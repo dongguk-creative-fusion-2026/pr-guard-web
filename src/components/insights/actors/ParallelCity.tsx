@@ -92,8 +92,8 @@ export function ParallelCity({ size, byPath, mock, t }: { size: number; byPath: 
     if (twin.current) twin.current.position.y += (0 - twin.current.position.y) * Math.min(1, dt * 1.6);
   });
 
-  const test = byPath.get(mock.failing.test);
-  const target = mock.failing.target ? byPath.get(mock.failing.target) : undefined;
+  const test = mock.failing ? byPath.get(mock.failing.test) : undefined;
+  const target = mock.failing?.target ? byPath.get(mock.failing.target) : undefined;
   const robot: [number, number, number] =
     t >= EXEC_T.target && target
       ? [target.x, roofOf(target) + size * 0.16, target.z]

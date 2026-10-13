@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { computeBriefing } from "@/components/graph/briefing";
-import type { GraphProgress, Project, PullRequest, RepoGraph, RepoInfo, Review } from "@/lib/api";
+import type { ExecutionInfo, GraphProgress, Project, PullRequest, RepoGraph, RepoInfo, Review } from "@/lib/api";
 import { fileName, formatTime, shortSha, VERDICT_LABEL } from "@/lib/format";
 import { finishOnboarding, pollNow, rebuildGraph, saveSettings, type FormState } from "../../../actions";
 
@@ -54,10 +54,12 @@ type Props = {
   pulls: PullRequest[];
   reviews: Review[];
   initialStep?: number;
+  /** 서버의 실행 환경 연결 상태 (설정 단계의 실행 검증 스위치) */
+  execution?: ExecutionInfo | null;
 };
 
 /** 등록 직후 온보딩. 어느 단계에서든 건너뛸 수 있고, 분석은 뒤에서 계속 돈다 */
-export function Onboarding({ project, graph, repo, pulls, reviews, initialStep = 0 }: Props) {
+export function Onboarding({ project, graph, repo, pulls, reviews, initialStep = 0, execution = null }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(initialStep);
   const [polled, setPolled] = useState<FormState | null>(null);
@@ -110,7 +112,7 @@ export function Onboarding({ project, graph, repo, pulls, reviews, initialStep =
         {step === 0 && <RepoStep project={project} repo={repo} />}
         {step === 1 && <AnalysisStep project={project} graph={graph} />}
         {step === 2 && <BriefingStep project={project} graph={graph} onWait={() => setStep(1)} />}
-        {step === 3 && <SettingsStep project={project} />}
+        {step === 3 && <SettingsStep project={project} execution={execution} />}
         {step === 4 && <FirstReviewStep project={project} pulls={pulls} reviews={reviews} polled={polled} setPolled={setPolled} />}
       </div>
 
@@ -393,12 +395,14 @@ function BriefingStep({ project, graph, onWait }: { project: Project; graph: Rep
   );
 }
 
-function SettingsStep({ project }: { project: Project }) {
+function SettingsStep({ project, execution }: { project: Project; execution: ExecutionInfo | null }) {
   const [comment, setComment] = useState(project.commentEnabled);
   const [threshold, setThreshold] = useState(project.majorThreshold ?? 1);
+  const [exec, setExec] = useState(project.execEnabled ?? false);
   const [state, setState] = useState<FormState>({});
   const [pending, start] = useTransition();
-  const changed = comment !== project.commentEnabled || threshold !== (project.majorThreshold ?? 1);
+  const changed =
+    comment !== project.commentEnabled || threshold !== (project.majorThreshold ?? 1) || exec !== (project.execEnabled ?? false);
   return (
     <section>
       <h2 className="ob-h">리뷰 설정</h2>
@@ -412,6 +416,26 @@ function SettingsStep({ project }: { project: Project }) {
         <div>
           <b>PR 에 코멘트 남기기</b>
           <p>요약 코멘트 1개와 지적한 줄에 라인 코멘트를 남겨요. 끄면 PR Guard 화면에서만 결과를 볼 수 있어요.</p>
+        </div>
+      </div>
+
+      <div className="ob-setting">
+        <label className="ob-switch">
+          <input type="checkbox" checked={exec} onChange={(e) => setExec(e.target.checked)} />
+          <span />
+        </label>
+        <div>
+          <b>실행 검증</b>
+          <p>
+            PR 마다 바뀌기 전 · 후 코드의 테스트를 실제로 돌려, 전에는 통과하던 테스트가 깨지는지 확인해요. 리뷰가 몇 분 걸려요.
+          </p>
+          <p className={execution?.available ? "ob-ok" : "ob-dim"}>
+            {execution === null
+              ? "서버의 실행 환경 상태를 알 수 없어요"
+              : execution.available
+                ? `실행 환경 연결됨 (${execution.runner})`
+                : "서버에 실행 환경이 아직 연결되지 않아, 켜 두어도 연결될 때까지는 건너뛰어요"}
+          </p>
         </div>
       </div>
 
@@ -431,7 +455,7 @@ function SettingsStep({ project }: { project: Project }) {
         <button
           className="ob-primary"
           disabled={pending || !changed}
-          onClick={() => start(async () => setState(await saveSettings(project.id, comment, threshold === 1 ? null : threshold)))}
+          onClick={() => start(async () => setState(await saveSettings(project.id, comment, threshold === 1 ? null : threshold, exec)))}
         >
           {pending ? "저장 중…" : "설정 저장"}
         </button>

@@ -10,8 +10,10 @@ import type { Insights } from "../metrics";
 export type ExecMock = {
   /** 돌릴 테스트 파일 (순서대로 켜진다) */
   tests: string[];
-  /** PR 전에는 통과, 후에는 실패한 테스트 파일과 그 테스트가 확인하는 코드 파일 */
-  failing: { test: string; target: string | null; cases: number };
+  /** PR 전에는 통과, 후에는 실패한 테스트 파일과 그 테스트가 확인하는 코드 파일 (깨진 게 없으면 null) */
+  failing: { test: string; target: string | null; cases: number } | null;
+  /** 실제 실행 결과면 true (예시 데이터가 아님) */
+  real?: boolean;
 };
 
 const stem = (p: string) => p.slice(p.lastIndexOf("/") + 1).replace(/\.[^.]+$/, "");
@@ -27,6 +29,27 @@ export function buildExecMock(insights: Insights): ExecMock | null {
     if (target) return { tests, failing: { test, target: target.path, cases: 2 } };
   }
   return { tests, failing: { test: tests[0], target: sources[0]?.path ?? null, cases: 1 } };
+}
+
+/** 테스트 클래스(com.a.FooTest#m)가 든 파일 */
+function testFile(name: string, paths: string[]): string | undefined {
+  const cls = name.split("#")[0].replace(/\$.*$/, "").replace(/\./g, "/");
+  return paths.find((p) => /\.(java|kt)$/.test(p) && p.replace(/\.(java|kt)$/, "").endsWith(cls));
+}
+
+/** 실제 실행 검증 결과 → 평행 도시 재료. 깨진 테스트는 파일로, 그 테스트가 확인하는 코드는 이름 짝으로 찾는다 */
+export function execFromReview(exec: { broken: string[] }, insights: Insights): ExecMock {
+  const paths = insights.files.map((f) => f.path);
+  const tests = insights.files.filter((f) => f.test).map((f) => f.path);
+  const brokenFiles = [...new Set(exec.broken.map((b) => testFile(b, paths)).filter((p): p is string => !!p))];
+  const first = brokenFiles[0];
+  const others = tests.filter((t) => !brokenFiles.includes(t)).slice(0, 13);
+  if (!first) return { tests: others, failing: null, real: true };
+  const name = stem(first).replace(/Tests?$|IT$/, "");
+  const target = insights.files.find((f) => !f.test && f.source && stem(f.path) === name)?.path ?? null;
+  // 깨진 테스트가 맨 앞이면 바로 빨갛게 켜지므로, 가운데쯤에 둔다
+  others.splice(Math.floor(others.length / 2), 0, first);
+  return { tests: others, failing: { test: first, target, cases: exec.broken.filter((b) => testFile(b, paths) === first).length }, real: true };
 }
 
 /** 장면 시각 (ms) */
@@ -55,7 +78,7 @@ export function testsDone(mock: ExecMock, t: number): number {
 export function execCaption(mock: ExecMock, t: number): { line: string; tone: string; step: number } {
   const n = mock.tests.length;
   const done = testsDone(mock, t);
-  const failedNow = done > mock.tests.indexOf(mock.failing.test) ? 1 : 0;
+  const failedNow = mock.failing && done > mock.tests.indexOf(mock.failing.test) ? 1 : 0;
   if (t < EXEC_T.run) return { line: "실행 검증: PR 전 · 후 코드를 각각 빌드합니다", tone: "", step: 0 };
   if (t < EXEC_T.diff) {
     return {
@@ -64,6 +87,7 @@ export function execCaption(mock: ExecMock, t: number): { line: string; tone: st
       step: 1,
     };
   }
+  if (!mock.failing) return { line: "PR 전 · 후 테스트 결과가 같음 · 회귀 없음", tone: "ok", step: 3 };
   const name = stem(mock.failing.test);
   if (t < EXEC_T.verdict) return { line: `PR 전에는 통과, PR 후에는 실패: ${name} (${mock.failing.cases}건)`, tone: "bad", step: 2 };
   const target = mock.failing.target ? stem(mock.failing.target) : null;
@@ -78,8 +102,10 @@ export function execCaption(mock: ExecMock, t: number): { line: string; tone: st
 export function execMarks(mock: ExecMock, t: number): Map<string, { color: string; badge: number }> {
   const marks = new Map<string, { color: string; badge: number }>();
   const done = testsDone(mock, t);
-  mock.tests.slice(0, done).forEach((p) => marks.set(p, { color: p === mock.failing.test ? "#ff4d5e" : "#4ade80", badge: 0 }));
-  if (t >= EXEC_T.target && mock.failing.target) marks.set(mock.failing.target, { color: "#ff4d5e", badge: mock.failing.cases });
-  if (t >= EXEC_T.diff) marks.set(mock.failing.test, { color: "#ff4d5e", badge: mock.failing.cases });
+  const failing = mock.failing;
+  mock.tests.slice(0, done).forEach((p) => marks.set(p, { color: p === failing?.test ? "#ff4d5e" : "#4ade80", badge: 0 }));
+  if (!failing) return marks;
+  if (t >= EXEC_T.target && failing.target) marks.set(failing.target, { color: "#ff4d5e", badge: failing.cases });
+  if (t >= EXEC_T.diff) marks.set(failing.test, { color: "#ff4d5e", badge: failing.cases });
   return marks;
 }
