@@ -5671,3 +5671,162 @@ a.cg-ref.pr:hover {
     display: none;
   }
 }
+
+/* 리뷰 장면 자막 (도시 위) */
+.dv-city-stage {
+  position: relative;
+}
+.show-cap {
+  position: absolute;
+  z-index: 5;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(10, 10, 14, 0.82);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.show-cap-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.show-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.show-live {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #ff2236;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  animation: show-pulse 1.4s ease-in-out infinite;
+}
+@keyframes show-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.show-line {
+  margin: 0 0 10px;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.show-line.bad {
+  color: #ff6b78;
+}
+.show-line.warn {
+  color: #facc15;
+}
+.show-line.ok {
+  color: #4ade80;
+}
+.show-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+.show-steps li {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.show-steps li.done {
+  color: var(--fg-2);
+}
+.show-steps li.now {
+  border-color: #38e1ff;
+  color: #38e1ff;
+}
+
+/* 입구: 리뷰 장면 */
+.en-show {
+  position: absolute;
+  left: 20px;
+  right: 460px;
+  bottom: 64px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+}
+.en-show .show-cap {
+  position: static;
+  max-width: 620px;
+}
+.en-show-actions {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+.en-show-actions button,
+.en-play {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(14, 14, 17, 0.85);
+  color: var(--fg-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.en-show-actions button:hover,
+.en-play:hover {
+  color: var(--fg);
+}
+.en-play {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.en-play i {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid #38e1ff;
+}
+@media (max-width: 900px) {
+  .en-show {
+    right: 20px;
+    bottom: 12px;
+  }
+  .show-cap {
+    padding: 10px 12px;
+  }
+  .show-line {
+    font-size: 13px;
+  }
+}
+.dv-city .show-cap {
+  left: 12px;
+  bottom: 12px;
+  max-width: min(400px, calc(100% - 24px));
+  padding: 10px 12px;
+}
+.dv-city .show-line {
+  margin-bottom: 8px;
+  font-size: 13px;
+}

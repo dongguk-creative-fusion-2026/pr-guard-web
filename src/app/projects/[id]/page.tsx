@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type Finding } from "@/lib/api";
 import { formatTime, timeAgo } from "@/lib/format";
 import { buildQueue, type Lane } from "@/lib/queue";
-import type { EntryMark } from "@/components/insights/EntryCity";
+import type { EntryMark, EntryShow } from "@/components/insights/EntryCity";
 import { EntryCityClient } from "./EntryCityClient";
 import { GraphState } from "./GraphState";
 import { ProjectActions } from "./ProjectActions";
@@ -21,15 +21,8 @@ const MARK_LIMIT = 12;
  * 프로젝트 입구: 바닥에 프로젝트 구조대로 지은 코드 시티를 깔고, 사람이 볼 PR 이 건드린 건물을 판정 색으로 세운다.
  * 그 위 오른쪽에 PR 이력 · 커밋 이력 두 갈래 (숫자 한 줄과 지금 볼 것 몇 개)
  */
-export default async function ProjectPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ actors?: string }>;
-}) {
+export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
-  const preview = (await searchParams).actors === "1";
   if (!Number.isInteger(id)) notFound();
 
   let data;
@@ -57,11 +50,39 @@ export default async function ProjectPage({
   });
   const city = graph?.graph ?? null;
 
+  // 도시 위에 보여 줄 리뷰: 진행 중인 리뷰가 있으면 그것을 실시간으로, 없으면 보안 지적이 있는 최근 리뷰(없으면 가장 최근 리뷰)
+  let show: EntryShow | null = null;
+  if (city) {
+    const running = pulls.find((p) => p.state === "open" && p.latestReviewId && (p.latestReviewStatus === "RUNNING" || p.latestReviewStatus === "PENDING"));
+    if (running) {
+      show = { reviewId: running.latestReviewId!, number: running.number, title: running.title, live: true, changed: [], findings: null };
+    } else {
+      const security = (f: Finding) => f.category === "SECURITY" || f.grounding?.kind === "SECURITY";
+      let pick = flagged.map((i, k) => ({ item: i, detail: details[k] })).find((x) => x.detail?.findings.some(security));
+      if (!pick) {
+        const latest = items.find((i) => i.review?.status === "DONE");
+        const detail = latest ? await api.getReview(latest.review!.id).catch(() => null) : null;
+        if (latest && detail) pick = { item: latest, detail };
+      }
+      if (pick?.detail) {
+        const context = pick.detail.context;
+        show = {
+          reviewId: pick.item.review!.id,
+          number: pick.item.pull.number,
+          title: pick.item.pull.title,
+          live: false,
+          changed: context ? (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)) : [],
+          findings: pick.detail.findings,
+        };
+      }
+    }
+  }
+
   return (
     <main className={city ? "en en-stage" : "en"}>
       {city && (
         <div className="en-city">
-          <EntryCityClient data={city} projectId={id} marks={marks} preview={preview} />
+          <EntryCityClient data={city} projectId={id} marks={marks} show={show} />
           <div className="en-legend">
             <span>
               <i style={{ background: MARK_COLOR.BLOCKED }} />

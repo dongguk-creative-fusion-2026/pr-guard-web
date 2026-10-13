@@ -473,7 +473,7 @@ export function CodeCity({
         shadows={{ type: PCFShadowMap }}
         dpr={[1, 2]}
         // 인프라 층이 있으면 도시 둘레까지 보이게 조금 더 멀리서 시작한다
-        camera={{ position: wide ? [size * 0.55, size * 0.5, size * 1.85] : infra ? [size * 0.85, size * 1.35, size * 1.6] : embedded ? [size * 0.62, size * 0.98, size * 0.9] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
+        camera={{ position: wide ? (embedded ? [size * 0.42, size * 0.42, size * 1.45] : [size * 0.55, size * 0.5, size * 1.85]) : infra ? [size * 0.85, size * 1.35, size * 1.6] : embedded ? [size * 0.62, size * 0.98, size * 0.9] : [size * 0.8, size * 1.15, size * 1.05], fov: 42, near: 0.5, far: size * 10 }}
         onPointerMissed={() => {
           onSelect(null);
           onSelectInfra?.(null);
@@ -552,7 +552,7 @@ export function CodeCity({
           target={wide ? [size * shift, size * 0.4, -size * 0.3] : infra ? [-size * 0.16, 0, size * 0.12] : embedded ? [0, 0, size * 0.18] : [size * shift, 0, 0]}
           enableDamping
           enableZoom={!embedded}
-          autoRotate={rotate}
+          autoRotate={rotate && !wide}
           autoRotateSpeed={0.35}
           maxPolarAngle={Math.PI / 2.15}
           minDistance={size * 0.15}

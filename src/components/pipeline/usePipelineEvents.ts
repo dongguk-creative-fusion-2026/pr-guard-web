@@ -5,14 +5,17 @@ import type { ReviewEvent } from "./stages";
 
 /**
  * 리뷰 단계 스트림을 구독한다. 저장된 이벤트가 먼저 오고, 진행 중이면 이어서 온다.
- * 재연결하면 처음부터 다시 오므로 id 로 중복을 거른다.
+ * 재연결하면 처음부터 다시 오므로 id 로 중복을 거른다. enabled 가 false 면 구독하지 않는다.
  */
-export function usePipelineEvents(reviewId: number) {
+export function usePipelineEvents(reviewId: number, enabled = true) {
   const [events, setEvents] = useState<ReviewEvent[]>([]);
   const [ended, setEnded] = useState(false);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+    setEvents([]);
+    setEnded(false);
+    if (!enabled) return;
     const source = new EventSource(`/api/reviews/${reviewId}/events`);
     source.onopen = () => setConnected(true);
     source.addEventListener("stage", (m) => {
@@ -26,7 +29,7 @@ export function usePipelineEvents(reviewId: number) {
       source.close();
     });
     return () => source.close();
-  }, [reviewId]);
+  }, [reviewId, enabled]);
 
   return { events, ended, connected };
 }
