@@ -7,7 +7,7 @@ import type { ReviewEvent, StageId } from "@/components/pipeline/stages";
 import { usePipelineEvents } from "@/components/pipeline/usePipelineEvents";
 
 /** 연출 단계: 리뷰 단계 기록을 사람이 따라갈 수 있는 장면으로 묶는다 */
-export type ShowPhase = "collect" | "scan" | "impact" | "threat" | "ground" | "verdict" | "failed";
+export type ShowPhase = "collect" | "scan" | "impact" | "exec" | "threat" | "ground" | "verdict" | "failed";
 
 /** 보안 위협: 보안 검사나 AI 가 보안 문제라고 한 지적 */
 export type ShowThreat = { file: string; title: string; status: GroundStatus | null };
@@ -16,6 +16,12 @@ export type ShowThreat = { file: string; title: string; status: GroundStatus | n
 export type ShowArch = { from: string; to: string; rule: string; title: string };
 
 const ARCH_EDGE = /^(.+?) → (.+?)(?: \(|$)/;
+
+/**
+ * 실행 검증 결과: PR 전(base) · 후(head) 테스트 수, PR 전에는 통과했는데 후에는 깨진 테스트(클래스#메서드),
+ * head 빌드 · 테스트가 아예 실패했으면 그 이유
+ */
+export type ShowExec = { baseTests: number; headTests: number; headFailed: number; broken: string[]; buildFailed: string | null };
 
 /** 근거 확인 결과: 지적 하나가 층마다 어떻게 확인됐나 */
 export type ShowGrounded = { file: string; title: string; status: GroundStatus; layers: { layer: GroundLayerId; mark: GroundMark }[] };
@@ -29,6 +35,8 @@ export type ShowState = {
   threats: ShowThreat[];
   grounded: ShowGrounded[];
   arch: ShowArch[];
+  /** 실행 검증이 돈 리뷰면 그 결과 */
+  exec: ShowExec | null;
   verdict: Verdict | null;
   /** 지금 장면에서 몇 ms 지났는지 (훑기 순서 계산용) */
   elapsed: number;
@@ -43,6 +51,7 @@ const MIN_MS: Record<Exclude<ShowPhase, "verdict" | "failed">, number> = {
   collect: 1400,
   scan: 0, // 바뀐 파일 수에 따라 (SCAN_PER_FILE)
   impact: 2000,
+  exec: 12500,
   threat: 3200,
   ground: 5600,
 };
@@ -118,8 +127,23 @@ function material(events: ReviewEvent[], props: { changed: string[]; findings: F
   const rank: Record<GroundStatus, number> = { CONFIRMED: 0, AI_ONLY: 1, REFUTED: 2 };
   grounded.sort((a, b) => rank[a.status] - rank[b.status]);
 
+  // 실행 검증: 차등 비교까지 끝난 리뷰만 (꺼져 있으면 건너뜀으로 남는다)
+  let exec: ShowExec | null = null;
+  const diff = done.get("EXEC_DIFF");
+  if (diff && diff.status === "DONE" && diff.data) {
+    const d = diff.data;
+    exec = {
+      baseTests: Number(done.get("EXEC_TEST_BASE")?.data?.tests ?? 0),
+      headTests: Number(done.get("EXEC_TEST_HEAD")?.data?.tests ?? 0),
+      headFailed: Number(done.get("EXEC_TEST_HEAD")?.data?.failed ?? 0),
+      broken: [...((d.regressions as string[] | undefined) ?? []), ...((d.newFailures as string[] | undefined) ?? [])],
+      buildFailed: d.headFailed ? String(d.reason ?? "head 빌드 · 테스트 실패") : null,
+    };
+  }
+
   return {
     done,
+    exec,
     grounded: grounded.slice(0, 6),
     arch: arch.slice(0, 4),
     changed: changed.slice(0, 40),
@@ -148,6 +172,22 @@ function captionOf(phase: ShowPhase, m: ReturnType<typeof material>, elapsed: nu
     }
     case "impact":
       return m.impacted.length > 0 ? `호출 관계로 영향 추적 · 영향받는 파일 ${m.impacted.length}개` : "호출 관계로 영향 추적 · 다른 파일로 번지지 않음";
+    case "exec": {
+      const e = m.exec;
+      if (!e) return "실행 검증";
+      if (elapsed < EXEC_RUN_FROM) return "실행 검증: PR 전 · 후 코드를 각각 빌드해 테스트를 돌립니다";
+      if (elapsed < EXEC_DIFF_AT) {
+        const k = Math.min(1, (elapsed - EXEC_RUN_FROM) / (EXEC_DIFF_AT - EXEC_RUN_FROM - 400));
+        const base = Math.round(e.baseTests * k);
+        const head = Math.round(e.headTests * k);
+        const failing = Math.round(e.headFailed * k);
+        return `테스트 실행 · PR 전 ${base}/${e.baseTests} · PR 후 ${head - failing}/${e.headTests} 통과`;
+      }
+      if (e.buildFailed) return `PR 후 코드의 빌드 · 테스트가 실패: ${e.buildFailed}`;
+      if (e.broken.length === 0) return `PR 전 · 후 테스트 결과가 같음 · 회귀 없음 (${e.headTests}개)`;
+      const name = e.broken[0].replace(/^.*\.(?=[^.#]+#)/, "");
+      return `PR 전에는 통과, PR 후에는 실패: ${name}${e.broken.length > 1 ? ` 외 ${e.broken.length - 1}건` : ""}`;
+    }
     case "threat":
       return `보안 위협 감지 · ${m.threats[0]?.title ?? ""}${m.threats.length > 1 ? ` 외 ${m.threats.length - 1}건` : ""}`;
     case "ground": {
@@ -179,6 +219,8 @@ function ready(phase: ShowPhase, m: ReturnType<typeof material>): boolean {
       return (d.has("CHECK_C") && d.has("LLM")) || d.has("GROUND");
     case "ground":
       return d.has("GROUND");
+    case "exec":
+      return d.has("EXEC_DIFF");
     case "verdict":
       return d.has("VERDICT");
     case "failed":
@@ -186,7 +228,11 @@ function ready(phase: ShowPhase, m: ReturnType<typeof material>): boolean {
   }
 }
 
-const ORDER: ShowPhase[] = ["collect", "scan", "impact", "threat", "ground", "verdict"];
+const ORDER: ShowPhase[] = ["collect", "scan", "impact", "exec", "threat", "ground", "verdict"];
+
+/** 실행 검증 장면 안의 시각 (ms): 테스트가 켜지기 시작 · 차등 비교 (평행 도시와 맞춘다) */
+export const EXEC_RUN_FROM = 2200;
+export const EXEC_DIFF_AT = 8600;
 
 /**
  * 리뷰 하나를 코드 시티 위 장면으로 만든다. 단계 기록(SSE)을 받아, 진행 중이면 단계가 끝나는 대로,
@@ -236,6 +282,7 @@ export function useReviewShow({
           // 위협이 없으면 위협 장면을 건너뛴다
           if (next === "threat" && mat.threats.length === 0) continue;
           if (next === "scan" && mat.changed.length === 0) continue;
+          if (next === "exec" && !mat.exec) continue;
           return { index: i, since: t };
         }
         return s;
@@ -254,6 +301,7 @@ export function useReviewShow({
     threats: m.threats,
     grounded: m.grounded,
     arch: m.arch,
+    exec: m.exec,
     verdict: m.verdict,
     elapsed,
     caption: phase ? captionOf(phase, m, elapsed, prNumber) : "",

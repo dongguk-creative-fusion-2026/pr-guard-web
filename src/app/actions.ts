@@ -20,9 +20,14 @@ export async function registerProject(_: FormState, form: FormData): Promise<For
   redirect(`/projects/${id}/onboarding`);
 }
 
-export async function saveSettings(projectId: number, commentEnabled: boolean, majorThreshold: number | null): Promise<FormState> {
+export async function saveSettings(
+  projectId: number,
+  commentEnabled: boolean,
+  majorThreshold: number | null,
+  execEnabled: boolean,
+): Promise<FormState> {
   try {
-    await api.updateSettings(projectId, commentEnabled, majorThreshold);
+    await api.updateSettings(projectId, commentEnabled, majorThreshold, execEnabled);
     revalidatePath(`/projects/${projectId}`);
     return { message: "저장했습니다" };
   } catch (e) {

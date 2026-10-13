@@ -8,6 +8,7 @@ import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
 import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
 import { archNote } from "./actors/archNote";
+import { execFromReview, execMarks } from "./actors/execDemo";
 import { CodeCity, LEVEL_COLORS } from "./CodeCity";
 import { computeInsights } from "./metrics";
 
@@ -32,6 +33,8 @@ export function ImpactCityInline({ data, reviewId, prNumber, context, findings, 
   const show = useReviewShow({ reviewId, prNumber, changed, findings, round, impactHold: hold });
   const partners = useMemo(() => hiddenPartners(show.changed, insights), [show.changed, insights]);
   useEffect(() => setHold(partners.length > 0 ? 1800 : 0), [partners.length]);
+  const execCity = useMemo(() => (show.exec ? execFromReview(show.exec, insights) : null), [show.exec, insights]);
+  const inExec = show.phase === "exec" && !!execCity;
   const counts = [show.changed.length, show.impacted.length];
 
   return (
@@ -61,10 +64,11 @@ export function ImpactCityInline({ data, reviewId, prNumber, context, findings, 
           mode="structure"
           selected={null}
           onSelect={() => {}}
-          impact={showImpact(show, insights.byPath, partners)}
+          impact={inExec ? null : showImpact(show, insights.byPath, partners)}
+          marks={inExec && execCity ? execMarks(execCity, show.elapsed) : null}
           embedded
           wide
-          scene={(city) => <ReviewShowScene show={show} partners={partners} {...city} hackerX={-0.35} />}
+          scene={(city) => <ReviewShowScene show={show} partners={partners} exec={execCity} {...city} hackerX={-0.35} />}
         />
         <ShowCaption show={show} note={show.phase === "impact" || show.phase === "threat" ? (archNote(show.arch) ?? partnerNote(partners)) : null} />
       </div>

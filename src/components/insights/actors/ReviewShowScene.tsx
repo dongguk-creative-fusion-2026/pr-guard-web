@@ -8,6 +8,8 @@ import { AiRobot } from "./AiRobot";
 import { AttackBeam, ScanBeam, Shield } from "./effects";
 import { Hacker, HACKER_HANDS } from "./Hacker";
 import type { HiddenPartner } from "./hiddenCoupling";
+import type { ExecMock } from "./execDemo";
+import { ParallelCity } from "./ParallelCity";
 import { ArchBridges, CouplingCables, GroundStack } from "./layersFx";
 import { SCAN_PER_FILE, type ShowState, type ShowThreat } from "./reviewShow";
 
@@ -82,8 +84,11 @@ export function ReviewShowScene({
   byPath,
   hackerX = -0.85,
   partners = [],
+  exec = null,
 }: {
   show: ShowState;
+  /** 실행 검증 장면에서 그릴 평행 도시 재료 */
+  exec?: ExecMock | null;
   partners?: HiddenPartner[];
   size: number;
   byPath: Map<string, Building>;
@@ -194,7 +199,7 @@ export function ReviewShowScene({
       {phase === "ground" && (
         <GroundStack size={size} byPath={byPath} grounded={show.grounded} elapsed={show.elapsed} locate={locate} roofOf={topOf} base={stackBase} />
       )}
-      <FlyingRobot target={robot} scale={robotScale} />
+      {phase === "exec" && exec ? <ParallelCity mock={exec} t={show.elapsed} size={size} byPath={byPath} /> : <FlyingRobot target={robot} scale={robotScale} />}
       {beam && (
         <ScanBeam
           key={beam.b.file.path}

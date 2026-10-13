@@ -8,7 +8,7 @@ import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
 import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
 import { archNote } from "./actors/archNote";
-import { buildExecMock, execCaption, execMarks, useExecClock } from "./actors/execDemo";
+import { buildExecMock, execCaption, execFromReview, execMarks, useExecClock } from "./actors/execDemo";
 import { ParallelCity } from "./actors/ParallelCity";
 import { CodeCity } from "./CodeCity";
 import { computeInsights } from "./metrics";
@@ -64,6 +64,8 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
   });
   const partners = useMemo(() => hiddenPartners(state.changed, insights), [state.changed, insights]);
   useEffect(() => setHold(partners.length > 0 ? 1800 : 0), [partners.length]);
+  const execCity = useMemo(() => (state.exec ? execFromReview(state.exec, insights) : null), [state.exec, insights]);
+  const inExec = state.phase === "exec" && !!execCity;
   const close = () => {
     setPinned(null);
     setPlaying(false);
@@ -101,8 +103,8 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
           const pr = byFile.get(path)?.[0];
           router.push(pr ? `/projects/${projectId}/prs/${pr.number}` : `/projects/${projectId}/commits?file=${encodeURIComponent(path)}`);
         }}
-        marks={demo && mock ? execMarks(mock, t) : active ? null : cityMarks}
-        impact={current && !demo ? showImpact(state, insights.byPath, partners) : null}
+        marks={demo && mock ? execMarks(mock, t) : inExec && execCity ? execMarks(execCity, state.elapsed) : active ? null : cityMarks}
+        impact={current && !demo && !inExec ? showImpact(state, insights.byPath, partners) : null}
         onHover={setHovered}
         shift={0.22}
         wide={active}
@@ -110,7 +112,7 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
           demo && mock
             ? (city) => <ParallelCity mock={mock} t={t} {...city} />
             : current
-              ? (city) => <ReviewShowScene show={state} partners={partners} {...city} />
+              ? (city) => <ReviewShowScene show={state} partners={partners} exec={execCity} {...city} />
               : undefined
         }
       />
