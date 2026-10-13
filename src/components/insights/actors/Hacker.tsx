@@ -2,7 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { AdditiveBlending, CatmullRomCurve3, DoubleSide, LatheGeometry, SphereGeometry, Vector2, Vector3, type BufferGeometry, type Group, type Material } from "three";
+import { AdditiveBlending, CatmullRomCurve3, DoubleSide, LatheGeometry, SphereGeometry, Vector2, Vector3, type BufferGeometry, type Group, type Material, type Mesh, type MeshBasicMaterial } from "three";
 import { hologramMaterial } from "./hologram";
 import { codeTexture } from "./textures";
 
@@ -148,12 +148,18 @@ export function Hacker({
   position,
   rotation = 0,
   scale = 1,
+  presence = 1,
 }: {
   position: [number, number, number];
   rotation?: number;
   scale?: number;
+  /** 얼마나 또렷한가 (0 = 사라짐). 바뀌면 서서히 따라가고, 사라질 때는 크게 지직거린다 */
+  presence?: number;
 }) {
+  const root = useRef<Group>(null);
   const sway = useRef<Group>(null);
+  const shown = useRef(0);
+  const basics = useRef<{ material: MeshBasicMaterial; base: number }[] | null>(null);
   const cloak = useMemo(() => hologramMaterial(RED, { base: 0.035, rim: 1.15, lines: 0.06 }), []);
   const hand = useMemo(() => hologramMaterial(RED, { base: 0.08, rim: 1.2, lines: 0.06 }), []);
   const mask = useMemo(() => hologramMaterial(MASK, { base: 0.38, rim: 1.0, lines: 0.09 }), []);
@@ -164,15 +170,28 @@ export function Hacker({
   const curves = useMemo(() => [mustacheCurve(-1), mustacheCurve(1)], []);
   const codes = useMemo(() => [codeTexture(RED), codeTexture("#ff5a3d"), codeTexture(RED)], []);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
-    // 대체로 은은히 떨리다가 2.7초에 한 번 크게 지직거린다
-    const cut = t % 2.7 < 0.16;
-    const flicker = cut ? 0.55 : 0.9 + Math.sin(t * 47) * 0.05 + Math.sin(t * 13) * 0.05;
+    const fading = presence < shown.current - 0.02;
+    shown.current += (presence - shown.current) * Math.min(1, dt * (fading ? 1.4 : 2.2));
+    const p = shown.current;
+    if (root.current) root.current.visible = p > 0.02;
+    // 선 · 코드 같은 일반 재질은 처음 불투명도를 기억해 두고 p 만큼 줄인다
+    if (!basics.current && root.current) {
+      basics.current = [];
+      root.current.traverse((o) => {
+        const material = (o as Mesh).material as MeshBasicMaterial | undefined;
+        if (material && "isMeshBasicMaterial" in material && material.transparent) basics.current!.push({ material, base: material.opacity });
+      });
+    }
+    basics.current?.forEach(({ material, base }) => (material.opacity = base * p));
+    // 대체로 은은히 떨리다가 2.7초에 한 번 크게 지직거린다. 사라지는 중에는 계속 지직거린다
+    const cut = fading || t % 2.7 < 0.16;
+    const flicker = (cut ? 0.55 : 0.9 + Math.sin(t * 47) * 0.05 + Math.sin(t * 13) * 0.05) * p;
     for (const m of [cloak, hand, mask]) {
       m.uniforms.uTime.value = t;
       m.uniforms.uFlicker.value = flicker;
-      m.uniforms.uGlitch.value = cut ? scale * 0.18 : 0;
+      m.uniforms.uGlitch.value = cut ? scale * (fading ? 0.5 : 0.18) : 0;
     }
     if (sway.current) {
       sway.current.rotation.y = Math.sin(t * 0.25) * 0.04;
@@ -182,7 +201,7 @@ export function Hacker({
   });
 
   return (
-    <group position={position} rotation={[0, rotation, 0]} scale={scale}>
+    <group ref={root} position={position} rotation={[0, rotation, 0]} scale={scale}>
       <group ref={sway}>
         {/* 몸통: 처진 어깨에서 가슴으로 내려오는 망토 (앞뒤로 납작) */}
         <mesh geometry={torsoShape} scale={[1.2, 1, 0.55]} material={cloak} />

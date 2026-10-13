@@ -134,7 +134,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
 
               {review.summary && <p className="dv-summary">{review.summary}</p>}
 
-              {graph?.graph && <ImpactCityInlineClient data={graph.graph} context={context} findings={findings} href={`${base}/city`} />}
+              {graph?.graph && <ImpactCityInlineClient data={graph.graph} reviewId={review.id} prNumber={review.prNumber} context={context} findings={all} href={`${base}/city`} />}
 
               {findings.length === 0 ? (
                 <p className="dv-empty">지적 사항 없음</p>
