@@ -12,6 +12,11 @@ export type ShowPhase = "collect" | "scan" | "impact" | "threat" | "ground" | "v
 /** 보안 위협: 보안 검사나 AI 가 보안 문제라고 한 지적 */
 export type ShowThreat = { file: string; title: string; status: GroundStatus | null };
 
+/** 구조 변화: 이번 PR 이 만든, 구조를 거스르는 의존 (출발 파일 → 도착 파일) */
+export type ShowArch = { from: string; to: string; rule: string; title: string };
+
+const ARCH_EDGE = /^(.+?) → (.+?)(?: \(|$)/;
+
 /** 근거 확인 결과: 지적 하나가 층마다 어떻게 확인됐나 */
 export type ShowGrounded = { file: string; title: string; status: GroundStatus; layers: { layer: GroundLayerId; mark: GroundMark }[] };
 
@@ -23,6 +28,7 @@ export type ShowState = {
   impacted: string[];
   threats: ShowThreat[];
   grounded: ShowGrounded[];
+  arch: ShowArch[];
   verdict: Verdict | null;
   /** 지금 장면에서 몇 ms 지났는지 (훑기 순서 계산용) */
   elapsed: number;
@@ -43,7 +49,7 @@ const MIN_MS: Record<Exclude<ShowPhase, "verdict" | "failed">, number> = {
 export const SCAN_PER_FILE = 1100;
 const MAX_SCAN = 5;
 
-type RawFinding = { file?: string | null; title?: string; category?: string; kind?: string | null; status?: string };
+type RawFinding = { file?: string | null; title?: string; category?: string; kind?: string | null; status?: string; ruleId?: string; evidence?: string | null };
 
 const isSecurity = (f: { category?: string | null; kind?: string | null }) => f.category === "SECURITY" || f.kind === "SECURITY";
 
@@ -86,6 +92,15 @@ function material(events: ReviewEvent[], props: { changed: string[]; findings: F
     }
   }
 
+  // 구조 변화 지적: 증거의 "출발 → 도착"
+  const arch: ShowArch[] = [];
+  const archFrom = (f: RawFinding) => {
+    const m = f.ruleId?.startsWith("ARCH_") && f.evidence ? ARCH_EDGE.exec(f.evidence) : null;
+    if (m && f.title && !arch.some((a) => a.from === m[1] && a.to === m[2])) arch.push({ from: m[1], to: m[2], rule: f.ruleId!, title: f.title });
+  };
+  if (props.findings) props.findings.forEach((f) => archFrom(f));
+  else ((done.get("CHECK_D")?.data?.findings as RawFinding[] | undefined) ?? []).forEach(archFrom);
+
   // 근거 확인: 지적마다 층별 표시. 확인 → AI 만 → 뺀 지적 순
   const grounded: ShowGrounded[] = [];
   if (props.findings) {
@@ -106,6 +121,7 @@ function material(events: ReviewEvent[], props: { changed: string[]; findings: F
   return {
     done,
     grounded: grounded.slice(0, 6),
+    arch: arch.slice(0, 4),
     changed: changed.slice(0, 40),
     impacted: [...impacted].slice(0, 40),
     threats: [...threats.values()].slice(0, 4),
@@ -237,6 +253,7 @@ export function useReviewShow({
     impacted: m.impacted,
     threats: m.threats,
     grounded: m.grounded,
+    arch: m.arch,
     verdict: m.verdict,
     elapsed,
     caption: phase ? captionOf(phase, m, elapsed, prNumber) : "",

@@ -7,6 +7,7 @@ import { ReviewShowScene, showImpact } from "./actors/ReviewShowScene";
 import { useReviewShow } from "./actors/reviewShow";
 import { ShowCaption } from "./actors/ShowCaption";
 import { hiddenPartners, partnerNote } from "./actors/hiddenCoupling";
+import { archNote } from "./actors/archNote";
 import { buildExecMock, execCaption, execMarks, useExecClock } from "./actors/execDemo";
 import { ParallelCity } from "./actors/ParallelCity";
 import { CodeCity } from "./CodeCity";
@@ -124,7 +125,7 @@ export function EntryCity({ data, projectId, marks, show }: { data: GraphData; p
       )}
       {current && !demo && (
         <div className="en-show">
-          <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} note={state.phase === "impact" || state.phase === "threat" ? partnerNote(partners) : null} />
+          <ShowCaption show={state} title={`PR #${current.number} ${current.title}`} note={state.phase === "impact" || state.phase === "threat" ? (archNote(state.arch) ?? partnerNote(partners)) : null} />
           <div className="en-show-actions">
             {!state.live && <button onClick={() => setRound((r) => r + 1)}>다시 재생</button>}
             <button onClick={() => router.push(`/projects/${projectId}/prs/${current.number}`)}>PR 판단 보기</button>
