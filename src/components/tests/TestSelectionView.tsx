@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { SelectedTestClass, SelectionReasonKind, TestSelection, TestSelectionChange } from "@/lib/api";
 import { packageOf, seconds, simpleName, type ClassResult } from "@/lib/testSelection";
 import { TestFlow } from "./TestFlow";
+import type { MutationData } from "@/lib/trust";
 
 /** 바뀐 메서드가 테스트에 어떻게 닿는지 */
 const REACH_META: Record<TestSelectionChange["reach"], { label: string; tone: string }> = {
@@ -31,6 +32,8 @@ export function TestSelectionView({
   executed,
   reviewId,
   live,
+  mutation,
+  trust,
 }: {
   selection: TestSelection;
   results: Record<string, ClassResult>;
@@ -41,6 +44,9 @@ export function TestSelectionView({
   reviewId: number;
   /** 리뷰가 아직 진행 중: 장면이 실제 단계를 따라간다 */
   live: boolean;
+  mutation: MutationData | null;
+  /** 테스트 신뢰도 섹션 (서버에서 만든다) */
+  trust?: React.ReactNode;
 }) {
   const [hover, setHover] = useState<{ method?: string; test?: string } | null>(null);
   const [tab, setTab] = useState<Tab>("run");
@@ -71,7 +77,7 @@ export function TestSelectionView({
         <header className="ts-sec-head">
           <h2>바뀐 메서드 → {full || s.shadow ? "영향 있는 테스트" : "실행한 테스트"}</h2>
         </header>
-        <TestFlow selection={s} results={results} reviewId={reviewId} live={live} />
+        <TestFlow selection={s} results={results} reviewId={reviewId} live={live} mutation={mutation} />
         <details className="ts-map-fold">
           <summary>연결만 정리해서 보기</summary>
           <ImpactMap
@@ -169,6 +175,8 @@ export function TestSelectionView({
         )}
       </section>
 
+
+      {trust}
 
       <section className="ts-list" aria-label="테스트 클래스 목록">
         <header className="ts-sec-head">

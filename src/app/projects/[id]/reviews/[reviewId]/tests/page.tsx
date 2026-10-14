@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TestSelectionView } from "@/components/tests/TestSelectionView";
+import { TrustSection } from "@/components/tests/TrustSection";
+import type { MutationData } from "@/lib/trust";
 import { api, ApiError } from "@/lib/api";
 import { shortSha } from "@/lib/format";
 import { classResults, diffOf, pickSelection } from "@/lib/testSelection";
@@ -21,13 +23,16 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
-  const [{ review }, events, runs] = data;
+  const [{ review, findings }, events, runs] = data;
   if (review.projectId !== projectId) notFound();
 
   const back = `/projects/${projectId}/prs/${review.prNumber}?review=${review.id}`;
   const selection = pickSelection(runs, events);
   const diff = diffOf(events);
   const executed = runs.length > 0 && runs.every((r) => r.status === "DONE" || r.status === "FAILED");
+  const mutationEvent = [...events].reverse().find((e) => e.stage === "EXEC_MUTATION");
+  const mutation = mutationEvent?.status === "DONE" ? (mutationEvent.data as MutationData | null) : null;
+  const flaky = ((diff as { flaky?: { head?: string[] } } | null)?.flaky?.head ?? []) as string[];
 
   return (
     <main className="dv ts-page">
@@ -59,6 +64,15 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
           executed={executed}
           reviewId={review.id}
           live={review.status === "PENDING" || review.status === "RUNNING"}
+          mutation={mutation}
+          trust={
+            <TrustSection
+              mutation={mutation}
+              mutationNote={mutationEvent && mutationEvent.status !== "DONE" ? ((mutationEvent as { message?: string }).message ?? null) : null}
+              flaky={flaky}
+              findings={findings}
+            />
+          }
         />
       )}
     </main>

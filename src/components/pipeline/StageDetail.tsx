@@ -252,6 +252,23 @@ export function StageDetail({
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 
+      {d && stage === "EXEC_MUTATION" && (
+        <>
+          <p className="muted">
+            PR 이 바꾼 메서드에 작은 버그(조건 반전 · null 반환 · 호출 삭제 …)를 심고 고른 테스트를 돌립니다. 테스트가 실패하면 버그를 잡은 것입니다.
+          </p>
+          <p>
+            변이 {d.killed + d.survived + d.uncovered}개 · 잡음 <b>{d.killed}</b> · 놓침 <b>{d.survived}</b> · 안 닿음 {d.uncovered}
+            {d.score >= 0 && <> · 점수 {d.score}%</>}
+          </p>
+          {projectId != null && reviewId != null && (
+            <Link href={`/projects/${projectId}/reviews/${reviewId}/tests`} className="ts-detail-link">
+              어떤 버그를 막고 놓쳤는지 보기 →
+            </Link>
+          )}
+        </>
+      )}
+
       {d && stage === "EXEC_SELECT" && (
         <>
           <p className="muted">

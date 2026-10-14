@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePipelineEvents } from "@/components/pipeline/usePipelineEvents";
 import type { SelectedTestClass, TestSelection } from "@/lib/api";
-import { simpleName, type ClassResult } from "@/lib/testSelection";
+import { simpleName, topLevelClass, type ClassResult } from "@/lib/testSelection";
+import { killedStatus, mutantLabel, type MutationData } from "@/lib/trust";
 
 /**
  * 영향 테스트 선택을 실행 장면으로 보여 준다.
@@ -15,11 +16,12 @@ import { simpleName, type ClassResult } from "@/lib/testSelection";
  *   4. 바뀐 메서드에서 실행 열로 선이 뻗는다 (기준 기록 · 호출 그래프)
  *   5. 실행 열이 빛나며 base · head 에서 도는 동안 선에 신호가 흐른다
  *   6. 결과: 통과 · 회귀 · 새 실패
+ *   7. 변이: 바뀐 메서드에 심은 버그가 선을 타고 날아가, 테스트가 잡으면 방어막에 막히고 못 잡으면 뚫고 "놓친 버그" 칸으로 떨어진다
  * 리뷰가 진행 중이면 실제 단계(EXEC_TEST_*, EXEC_DIFF)를 따라가고, 끝난 리뷰는 같은 장면을 다시 재생한다.
  */
 
-type Phase = "intro" | "methods" | "filter" | "trace" | "running" | "result";
-const ORDER: Phase[] = ["intro", "methods", "filter", "trace", "running", "result"];
+type Phase = "intro" | "methods" | "filter" | "trace" | "running" | "result" | "mutation";
+const ORDER: Phase[] = ["intro", "methods", "filter", "trace", "running", "result", "mutation"];
 /** 다시 보기 시간표 (ms) */
 const REPLAY: [Phase, number][] = [
   ["methods", 600],
@@ -28,11 +30,25 @@ const REPLAY: [Phase, number][] = [
   ["running", 3800],
   ["result", 6800],
 ];
+/** 변이 단계는 결과 뒤에 이어서 */
+const MUTATION_AT = 8600;
+const MAX_BUGS = 36;
+/** 버그 하나가 선을 타는 시간 · 버그 사이 간격 (초) */
+const BUG_FLIGHT = 1.3;
+const BUG_GAP = 0.28;
 const MAX_POOL = 120;
 
 type Source = { id: string; label: string; sub: string; tone: string };
 type Edge = { from: string; to: string; kind: "TRACE" | "STATIC" | "SELF" };
-type Counts = { total: number; run: number; skip: number; methods: number; full: boolean; shadow: boolean };
+type Counts = {
+  total: number;
+  run: number;
+  skip: number;
+  methods: number;
+  full: boolean;
+  shadow: boolean;
+  mutation: MutationData | null;
+};
 
 const CAPTION: Record<Phase, (n: Counts) => string> = {
   intro: (n) => `레포의 테스트 클래스 ${n.total}개`,
@@ -46,6 +62,12 @@ const CAPTION: Record<Phase, (n: Counts) => string> = {
   trace: () => "기준 기록을 따라 바뀐 메서드 → 테스트 연결",
   running: (n) => (n.full || n.shadow ? `${n.total}개 전체를 base · head 에서 실행 중` : `${n.run}개만 base · head 에서 실행 중`),
   result: () => "결과",
+  mutation: (n) =>
+    !n.mutation
+      ? "바뀐 메서드에 버그를 심는 중"
+      : `바뀐 메서드에 버그 ${n.mutation.killed + n.mutation.survived + n.mutation.uncovered}개를 심었습니다 · 테스트가 ${n.mutation.killed}개 막고 ${
+          n.mutation.survived + n.mutation.uncovered
+        }개 놓침`,
 };
 
 export function TestFlow({
@@ -53,12 +75,15 @@ export function TestFlow({
   results,
   reviewId,
   live,
+  mutation,
 }: {
   selection: TestSelection;
   results: Record<string, ClassResult>;
   reviewId: number;
   /** 실행이 아직 끝나지 않음: 실제 단계를 따라간다 */
   live: boolean;
+  /** 변경분 변이 테스트 결과 (EXEC_MUTATION). 없으면 변이 장면을 건너뛴다 */
+  mutation: MutationData | null;
 }) {
   const reduce = useReducedMotion();
   const router = useRouter();
@@ -73,6 +98,7 @@ export function TestFlow({
     methods: selection.changes.length,
     full,
     shadow: selection.shadow,
+    mutation,
   };
 
   // ── 단계: 다시 보기 또는 실제 진행
@@ -82,14 +108,21 @@ export function TestFlow({
   useEffect(() => {
     if (live || reduce) return;
     setPhase("intro");
-    const timers = REPLAY.map(([p, ms]) => setTimeout(() => setPhase(p), ms));
+    const plan: [Phase, number][] = mutation ? [...REPLAY, ["mutation", MUTATION_AT]] : REPLAY;
+    const timers = plan.map(([p, ms]) => setTimeout(() => setPhase(p), ms));
     return () => timers.forEach(clearTimeout);
-  }, [replayKey, live, reduce]);
+  }, [replayKey, live, reduce, mutation]);
+  useEffect(() => {
+    // 움직임을 줄인 화면은 바로 마지막 장면
+    if (reduce && !live) setPhase(mutation ? "mutation" : "result");
+  }, [reduce, live, mutation]);
   useEffect(() => {
     if (!live) return;
     const st = (s: string) => [...events].reverse().find((e) => e.stage === s)?.status;
-    if (st("EXEC_DIFF") === "DONE" || st("REVIEW") === "DONE" || st("REVIEW") === "FAILED") {
-      setPhase("result");
+    if (st("EXEC_MUTATION") === "RUNNING") {
+      setPhase("mutation");
+    } else if (st("EXEC_DIFF") === "DONE" || st("REVIEW") === "DONE" || st("REVIEW") === "FAILED") {
+      setPhase(mutation ? "mutation" : "result");
       // 결과(테스트 실행 기록)를 다시 받아 온다
       router.refresh();
     } else if (st("EXEC_TEST_BASE") === "RUNNING" || st("EXEC_TEST_HEAD") === "RUNNING") {
@@ -97,7 +130,7 @@ export function TestFlow({
     } else if (st("EXEC_SELECT") === "DONE") {
       setPhase("trace");
     }
-  }, [events, live, router]);
+  }, [events, live, router, mutation]);
   const at = (p: Phase) => ORDER.indexOf(phase) >= ORDER.indexOf(p);
   const split = at("filter");
 
@@ -138,7 +171,25 @@ export function TestFlow({
     return r.head || r.base ? "ok" : "none";
   };
   /** 실행 열 테스트 */
-  const runState = (p: SelectedTestClass) => (phase === "result" ? `done-${outcome(p)}` : phase === "running" ? "running" : "on");
+  const runState = (p: SelectedTestClass) =>
+    phase === "result" || phase === "mutation" ? `done-${outcome(p)}` : phase === "running" ? "running" : "on";
+
+  // ── 변이: 테스트별 막은 버그 수, 날아갈 버그들
+  const blocked: Record<string, number> = {};
+  const pierced: Record<string, number> = {};
+  const bugs: { from: string; to: string | null; killed: boolean; label: string }[] = [];
+  for (const m of mutation?.methods ?? []) {
+    for (const x of m.mutants) {
+      const killed = killedStatus(x.status);
+      const killer = x.killers[0] ? topLevelClass(x.killers[0]) : null;
+      const cover = x.covering[0] ? topLevelClass(x.covering[0]) : null;
+      const to = killed ? killer : cover;
+      if (killed && killer) blocked[killer] = (blocked[killer] ?? 0) + 1;
+      if (!killed && cover) pierced[cover] = (pierced[cover] ?? 0) + 1;
+      if (bugs.length < MAX_BUGS) bugs.push({ from: m.id, to, killed, label: mutantLabel(x) });
+    }
+  }
+  const missed = mutation ? mutation.survived + mutation.uncovered : 0;
   /** 무더기에 남은 테스트: 꺼지거나(선택 실행) 함께 돈다(전체 · 그림자) */
   const poolState = (p: SelectedTestClass) => {
     if (!split) return "idle";
@@ -162,7 +213,13 @@ export function TestFlow({
       title={`${p.className}\n${p.reasons.map((r) => r.detail).join("\n")}`}
     >
       <span className="mono tf-pill-label">{simpleName(p.className)}</span>
-      <span className="tf-pill-state">{label(state, p, results)}</span>
+      <span className="tf-pill-state">
+        {phase === "mutation" && inRun && (blocked[p.className] || pierced[p.className])
+          ? [blocked[p.className] ? `막음 ${blocked[p.className]}` : "", pierced[p.className] ? `뚫림 ${pierced[p.className]}` : ""]
+              .filter(Boolean)
+              .join(" · ")
+          : label(state, p, results)}
+      </span>
     </motion.li>
   );
 
@@ -184,7 +241,7 @@ export function TestFlow({
       </div>
 
       <LayoutGroup>
-        <div className={`tf-stage${split ? " split" : ""}`} ref={box}>
+        <div className={`tf-stage${split ? " split" : ""}${phase === "mutation" ? " mutating" : ""}`} ref={box}>
           <svg className="tf-wires" aria-hidden="true">
             <defs>
               <filter id="tf-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -219,6 +276,10 @@ export function TestFlow({
               })}
           </svg>
 
+          {phase === "mutation" && mutation && origin && (
+            <Bugs key={`bugs-${replayKey}`} bugs={bugs} pos={pos} origin={origin} reduce={!!reduce} />
+          )}
+
           <ol className="tf-sources" aria-label="PR 이 바꾼 것">
             {sources.map((s, i) => (
               <motion.li
@@ -251,6 +312,18 @@ export function TestFlow({
               </li>
             )}
           </ol>
+
+          {phase === "mutation" && mutation && (
+            <motion.div
+              className={`tf-bin${missed > 0 ? " has" : ""}`}
+              ref={ref("bin")}
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <b>{missed}</b>
+              <span>놓친 버그</span>
+            </motion.div>
+          )}
         </div>
       </LayoutGroup>
 
@@ -261,8 +334,73 @@ export function TestFlow({
         <span><i className="tf-k bad" /> 회귀</span>
         <span><i className="tf-line" /> 기록상 지나감</span>
         <span><i className="tf-line static" /> 호출 그래프</span>
+        {mutation && (
+          <>
+            <span><i className="tf-bug" /> 심은 버그</span>
+            <span><i className="tf-k shield" /> 테스트가 막음</span>
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * 날아가는 버그. 이 svg 는 변이 단계가 시작될 때 새로 붙어서, SMIL 시간(begin)이 단계 시작부터 센다.
+ * 막힌 버그: 테스트 앞에서 방어막이 번쩍이고 사라짐. 놓친 버그: 테스트를 뚫고 "놓친 버그" 칸으로 떨어짐.
+ */
+function Bugs({
+  bugs,
+  pos,
+  origin,
+  reduce,
+}: {
+  bugs: { from: string; to: string | null; killed: boolean; label: string }[];
+  pos: Record<string, DOMRect>;
+  origin: DOMRect;
+  reduce: boolean;
+}) {
+  const bin = pos["bin"];
+  if (reduce) return null;
+  return (
+    <svg className="tf-bugs" aria-hidden="true">
+      {bugs.map((b, i) => {
+        const a = pos[`s:${b.from}`];
+        const t = b.to ? pos[`t:${b.to}`] : undefined;
+        if (!a) return null;
+        let d: string;
+        if (b.killed && t) {
+          d = wire(a, t, origin);
+        } else if (!b.killed && t && bin) {
+          // 테스트를 뚫고 지나가 놓친 버그 칸으로
+          d = `${wire(a, t, origin)} L${t.right - origin.left} ${t.top + t.height / 2 - origin.top} L${bin.left + bin.width / 2 - origin.left} ${bin.top - origin.top + 6}`;
+        } else if (bin) {
+          d = `M${a.right - origin.left} ${a.top + a.height / 2 - origin.top} L${bin.left + bin.width / 2 - origin.left} ${bin.top - origin.top + 6}`;
+        } else {
+          return null;
+        }
+        const begin = i * BUG_GAP;
+        const end = begin + BUG_FLIGHT;
+        const tx = t ? t.left - origin.left - 2 : 0;
+        const ty = t ? t.top + t.height / 2 - origin.top : 0;
+        return (
+          <g key={i}>
+            <circle r="4.5" className={`tf-bug-dot ${b.killed ? "k" : "s"}`} opacity="0">
+              <title>{b.label}</title>
+              <set attributeName="opacity" to="1" begin={`${begin}s`} />
+              <animateMotion path={d} dur={`${BUG_FLIGHT}s`} begin={`${begin}s`} fill="freeze" calcMode="spline" keySplines="0.4 0 0.6 1" keyTimes="0;1" />
+              <set attributeName="opacity" to="0" begin={`${end}s`} />
+            </circle>
+            {b.killed && t && (
+              <circle cx={tx} cy={ty} r="6" className="tf-shield" opacity="0">
+                <animate attributeName="r" from="6" to="26" begin={`${end}s`} dur="0.5s" fill="freeze" />
+                <animate attributeName="opacity" values="0.95;0" begin={`${end}s`} dur="0.5s" fill="freeze" />
+              </circle>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 

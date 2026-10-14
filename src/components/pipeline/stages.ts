@@ -17,6 +17,7 @@ export type StageId =
   | "EXEC_POD_HEAD"
   | "EXEC_TEST_BASE"
   | "EXEC_TEST_HEAD"
+  | "EXEC_MUTATION"
   | "EXEC_DIFF"
   | "EXEC_EVIDENCE"
   | "EXEC_SELECT"
@@ -66,6 +67,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   EXEC_POD_HEAD: { label: "head Pod 기동", hint: "스케줄 · 이미지 · 기동" },
   EXEC_TEST_BASE: { label: "base 빌드 · 테스트", hint: "clone · 빌드 · 테스트" },
   EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트" },
+  EXEC_MUTATION: { label: "변이 테스트", hint: "심은 버그를 테스트가 잡나" },
   EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패" },
   EXEC_EVIDENCE: { label: "증거 테스트", hint: "바뀐 동작을 테스트로 고정" },
   EXEC_SELECT: { label: "테스트 선택", hint: "영향 있는 테스트만 실행" },
@@ -99,6 +101,8 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_TEST_BASE: { x: 4 * COL, y: 5.3 * ROW },
   EXEC_TEST_HEAD: { x: 4 * COL, y: 6.5 * ROW },
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
+  // 변이 테스트: head 빌드 · 테스트 안에서 이어서 돈다
+  EXEC_MUTATION: { x: 4.5 * COL, y: 7.5 * ROW },
   // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
   EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },
   // 테스트 선택: 바뀐 메서드와 기준 실행 기록으로 돌릴 테스트를 골라 빌드 · 테스트에 넘긴다
@@ -132,6 +136,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   EXEC_TEST_BASE: { x: 1.6 * VCOL, y: 4 * VROW },
   EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
   EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
+  EXEC_MUTATION: { x: 3.1 * VCOL, y: 4.5 * VROW },
   EXEC_EVIDENCE: { x: -VCOL, y: 3.5 * VROW },
   EXEC_SELECT: { x: 2.1 * VCOL, y: 0.88 * VROW },
   GROUND: { x: 0, y: 7 * VROW },
@@ -164,6 +169,8 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["EXEC_POD_HEAD", "EXEC_TEST_HEAD"],
   ["EXEC_TEST_BASE", "EXEC_DIFF"],
   ["EXEC_TEST_HEAD", "EXEC_DIFF"],
+  ["EXEC_TEST_HEAD", "EXEC_MUTATION"],
+  ["EXEC_MUTATION", "EXEC_DIFF"],
   ["EXEC_DIFF", "GROUND"],
   ["METHOD_DIFF", "EXEC_EVIDENCE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_BASE"],
@@ -236,6 +243,8 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
     case "EXEC_TEST_BASE":
     case "EXEC_TEST_HEAD":
       return [`테스트 ${data.tests}`, `실패 ${data.failed}`];
+    case "EXEC_MUTATION":
+      return data.score >= 0 ? [`점수 ${data.score}%`, `놓침 ${data.survived}`] : [`안 닿음 ${data.uncovered}`];
     case "EXEC_DIFF": {
       if (data.headFailed) return ["head 빌드 실패"];
       const missed = data.selection?.missed?.length ?? 0;
@@ -245,6 +254,7 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
         `새 실패 ${data.newFailures?.length ?? 0}`,
         ...(proven > 0 ? [`동작 변화 ${proven}`] : []),
         ...(missed > 0 ? [`선택 누락 ${missed}`] : []),
+      ...((data.flaky?.head?.length ?? 0) > 0 ? [`flaky ${data.flaky.head.length}`] : []),
       ];
     }
     case "EXEC_EVIDENCE":
@@ -269,4 +279,4 @@ export function durationMs(s: StageState): number | null {
 }
 
 /** 실행 검증 레인 단계 (배경 묶음 상자를 그릴 때 쓴다) */
-export const EXEC_STAGES = ["EXEC_PREPARE", "EXEC_POD_BASE", "EXEC_POD_HEAD", "EXEC_TEST_BASE", "EXEC_TEST_HEAD", "EXEC_DIFF"] as const;
+export const EXEC_STAGES = ["EXEC_PREPARE", "EXEC_POD_BASE", "EXEC_POD_HEAD", "EXEC_TEST_BASE", "EXEC_TEST_HEAD", "EXEC_MUTATION", "EXEC_DIFF"] as const;
