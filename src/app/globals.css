@@ -5855,3 +5855,78 @@ a.cg-ref.pr:hover {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* 오류 · 없음 · 불러오는 중 (error.tsx · not-found.tsx · loading.tsx) */
+.status-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: calc(100vh - var(--bar-h));
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--fg-2);
+}
+
+.status-screen h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--fg);
+}
+
+.status-screen.danger h1 {
+  color: var(--danger);
+}
+
+.status-screen.loading {
+  flex-direction: row;
+  color: var(--muted);
+}
+
+.status-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 480px;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.status-code {
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.status-digest {
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.status-link {
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-screen .spinner {
+    animation: none;
+  }
+}
