@@ -4,6 +4,12 @@ import "server-only";
 export const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
 const BASE = API_BASE;
 
+/** 백엔드에 API_TOKEN 이 걸려 있으면 같은 값을 X-Api-Token 으로 보낸다 (브라우저에는 나가지 않는다) */
+export function apiAuthHeaders(): Record<string, string> {
+  const token = process.env.API_TOKEN?.trim();
+  return token ? { "X-Api-Token": token } : {};
+}
+
 export type Project = {
   id: number;
   owner: string;
@@ -367,7 +373,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(BASE + path, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers: { "Content-Type": "application/json", ...apiAuthHeaders(), ...init?.headers },
       cache: "no-store",
     });
   } catch {

@@ -89,6 +89,8 @@ src/
 | 변수 | 설명 |
 |---|---|
 | `API_BASE_URL` | pr-guard-api 주소 (기본 `http://localhost:8080`). 서버에서 실행할 때 읽는다 |
+| `ACCESS_TOKEN` | 있으면 화면 전체가 토큰 입력(`/login`) 뒤로 간다. 팀원에게 나눠 주는 값. 바꾸면 모두 다시 입력해야 한다 |
+| `API_TOKEN` | pr-guard-api 의 `API_TOKEN` 과 같은 값. 서버에서 백엔드를 부를 때 `X-Api-Token` 으로 보낸다 (브라우저로 나가지 않음) |
 
 ## 로컬 실행
 
@@ -99,4 +101,4 @@ API_BASE_URL=http://localhost:8080 npm run dev
 
 ## Vercel 배포
 
-Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인)을 넣는다. 다른 설정은 기본값 그대로.
+Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `ACCESS_TOKEN`, `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.
