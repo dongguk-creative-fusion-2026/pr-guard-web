@@ -7,6 +7,7 @@ import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
+import Link from "next/link";
 import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
 
 type GroundView = {
@@ -29,10 +30,12 @@ export function StageDetail({
   stage,
   state,
   projectId,
+  reviewId,
 }: {
   stage: Exclude<StageId, "REVIEW">;
   state: StageState;
   projectId?: number;
+  reviewId?: number;
 }) {
   const meta = STAGE_META[stage];
   const d = state.data;
@@ -248,6 +251,38 @@ export function StageDetail({
       )}
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
+
+      {d && stage === "EXEC_SELECT" && (
+        <>
+          <p className="muted">
+            예전 전체 실행에서 테스트마다 지나간 메서드를 기록해 두고, 이번 PR 이 바꾼 메서드를 지나가는 테스트만 base · head 에서 똑같이 돌립니다.
+          </p>
+          <p>
+            {d.mode === "FULL" ? (
+              <>전체 실행 · 테스트 클래스 {d.total}개</>
+            ) : (
+              <>
+                테스트 클래스 {d.total}개 중 <b>{d.shadow ? d.impacted : d.run}개</b> {d.shadow ? "면 충분 (그림자 모드라 전체 실행)" : "실행"}
+                {!d.shadow && d.skippedSeconds > 0 && <> · 약 {Math.round(d.skippedSeconds)}초 절약</>}
+              </>
+            )}
+          </p>
+          {d.mode === "FULL" && (
+            <ul className="finding-list">
+              {(d.fullReasons as string[]).map((r) => (
+                <li key={r}>
+                  <span className="sev MAJOR">전체</span> {r}
+                </li>
+              ))}
+            </ul>
+          )}
+          {projectId != null && reviewId != null && (
+            <Link href={`/projects/${projectId}/reviews/${reviewId}/tests`} className="ts-detail-link">
+              어떤 테스트를 돌리고 걸렀는지 보기 →
+            </Link>
+          )}
+        </>
+      )}
 
       {d && stage === "GROUND" && (
         <>

@@ -19,6 +19,7 @@ export type StageId =
   | "EXEC_TEST_HEAD"
   | "EXEC_DIFF"
   | "EXEC_EVIDENCE"
+  | "EXEC_SELECT"
   | "GROUND"
   | "VERDICT"
   | "PUBLISH"
@@ -67,6 +68,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트" },
   EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패" },
   EXEC_EVIDENCE: { label: "증거 테스트", hint: "바뀐 동작을 테스트로 고정" },
+  EXEC_SELECT: { label: "테스트 선택", hint: "영향 있는 테스트만 실행" },
   GROUND: { label: "근거 확인", hint: "인덱스 · 이력 · 실행 · AI" },
   VERDICT: { label: "판정", hint: "규칙으로 계산" },
   PUBLISH: { label: "PR 코멘트", hint: "요약 · 라인" },
@@ -99,6 +101,8 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
   // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
   EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },
+  // 테스트 선택: 바뀐 메서드와 기준 실행 기록으로 돌릴 테스트를 골라 빌드 · 테스트에 넘긴다
+  EXEC_SELECT: { x: 2.6 * COL, y: 4.1 * ROW },
   // 모든 지적이 모여 층별 근거를 맞춰 본 뒤 판정으로
   GROUND: { x: 6 * COL, y: 2 * ROW },
   VERDICT: { x: 7 * COL, y: 2 * ROW },
@@ -129,6 +133,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
   EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
   EXEC_EVIDENCE: { x: -VCOL, y: 3.5 * VROW },
+  EXEC_SELECT: { x: 2.1 * VCOL, y: 0.88 * VROW },
   GROUND: { x: 0, y: 7 * VROW },
   VERDICT: { x: 0, y: 8 * VROW },
   PUBLISH: { x: 0, y: 9 * VROW },
@@ -163,6 +168,9 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["METHOD_DIFF", "EXEC_EVIDENCE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_BASE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_HEAD"],
+  ["METHOD_DIFF", "EXEC_SELECT"],
+  ["EXEC_SELECT", "EXEC_TEST_BASE"],
+  ["EXEC_SELECT", "EXEC_TEST_HEAD"],
   ["VERDICT", "PUBLISH"],
 ];
 
@@ -230,15 +238,21 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
       return [`테스트 ${data.tests}`, `실패 ${data.failed}`];
     case "EXEC_DIFF": {
       if (data.headFailed) return ["head 빌드 실패"];
+      const missed = data.selection?.missed?.length ?? 0;
       const proven = (data.evidence ?? []).filter((e: { kind: string }) => e.kind === "PROVEN").length;
       return [
         `회귀 ${data.regressions?.length ?? 0}`,
         `새 실패 ${data.newFailures?.length ?? 0}`,
         ...(proven > 0 ? [`동작 변화 ${proven}`] : []),
+        ...(missed > 0 ? [`선택 누락 ${missed}`] : []),
       ];
     }
     case "EXEC_EVIDENCE":
       return [`테스트 ${data.tests?.length ?? 0}`, ...(data.generator ? [String(data.generator)] : [])];
+    case "EXEC_SELECT":
+      if (data.mode === "FULL") return ["전체 실행", `${data.total}개`];
+      if (data.shadow) return [`${data.impacted}/${data.total} 영향`, "그림자"];
+      return [`${data.run}/${data.total} 실행`, `${(data.total ?? 0) - (data.run ?? 0)} 걸러짐`];
     case "GROUND":
       return [`확인 ${data.confirmed}`, `AI만 ${data.aiOnly}`, ...(data.refuted ? [`뺌 ${data.refuted}`] : [])];
     case "VERDICT":

@@ -358,6 +358,66 @@ export type Lesson = {
   examples: { prNumber: number; reviewId: number; severity: Severity; file: string | null; title: string }[];
 };
 
+/** 영향 테스트 선택 (백엔드 TestSelection). 어떤 테스트 클래스를 왜 돌리고 왜 걸렀는지 */
+export type TestSelection = {
+  /** SELECTED: 영향 있는 테스트만, FULL: 전체 (fullReasons 에 이유), OFF: 선택을 쓰지 않음 */
+  mode: "SELECTED" | "FULL" | "OFF";
+  /** 전체를 돌리되 "골랐다면"만 기록 (놓친 실패가 없는지 확인용) */
+  shadow: boolean;
+  fullReasons: string[];
+  /** 테스트 → 지나간 메서드를 알려 준 전체 실행 기록 */
+  reference: { runId: number; prNumber: number | null; sha: string; sameAsBase: boolean; finishedAt: string | null; tests: number } | null;
+  changes: TestSelectionChange[];
+  tests: SelectedTestClass[];
+  total: number;
+  impacted: number;
+  run: number;
+  /** 기준 기록에서 전체 테스트가 걸린 시간 (초) */
+  referenceSeconds: number;
+  /** 거른 테스트가 기준 기록에서 걸린 시간 (초) */
+  skippedSeconds: number;
+};
+
+/** 바뀐 메서드 하나. reach: TRACED 기록상 지나감, STATIC 호출 그래프로만, NONE 닿는 테스트 없음, OUTSIDE 테스트 밖에서 실행, UNTRACKED 기록 못 하는 위치 */
+export type TestSelectionChange = {
+  id: string;
+  kind: "ADDED" | "REMOVED" | "MODIFIED";
+  file: string;
+  line: number;
+  reach: "TRACED" | "STATIC" | "NONE" | "OUTSIDE" | "UNTRACKED";
+  tests: string[];
+};
+
+export type SelectionReasonKind = "TRACE" | "STATIC" | "CHANGED_TEST" | "UNKNOWN" | "NO_IMPACT";
+
+export type SelectedTestClass = {
+  className: string;
+  file: string;
+  impacted: boolean;
+  run: boolean;
+  reasons: { kind: SelectionReasonKind; target: string | null; detail: string }[];
+  seconds: number;
+  /** 기준 기록에서 이 클래스가 지나간 메서드 수 (기록에 없으면 -1) */
+  referenceMethods: number;
+};
+
+/** 리뷰의 base · head 테스트 실행 기록 */
+export type TestRun = {
+  id: number;
+  side: "BASE" | "HEAD";
+  sha: string;
+  status: "QUEUED" | "STARTED" | "DONE" | "FAILED";
+  tests: number | null;
+  failures: number | null;
+  errors: number | null;
+  skipped: number | null;
+  results: { name: string; status: "PASSED" | "FAILED" | "ERROR" | "SKIPPED"; message: string | null; time?: number }[] | null;
+  error: string | null;
+  /** PENDING 고르는 중 · ALL 전체 · FILTER 영향 있는 테스트만. 예전 백엔드에는 없다 */
+  selectionState?: "PENDING" | "ALL" | "FILTER";
+  selection?: TestSelection | null;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -439,6 +499,8 @@ export const api = {
   getLessons: (id: number) => orIfMissing(call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`), [] as Lesson[]),
   createAgentsPull: (id: number, content: string) =>
     call<{ url: string }>(`/api/projects/${id}/agents-md/pull`, { method: "POST", body: JSON.stringify({ content }) }),
+  /** 리뷰의 base · head 테스트 실행 기록. 실행 검증을 돌리지 않았으면 빈 목록 */
+  getTestRuns: (reviewId: number) => orIfMissing(call<TestRun[]>(`/api/reviews/${reviewId}/test-runs`), [] as TestRun[]),
   rerun: (id: number, number: number) =>
     call<Review>(`/api/projects/${id}/pulls/${number}/reviews`, { method: "POST" }),
 };

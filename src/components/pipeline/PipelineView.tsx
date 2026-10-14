@@ -268,7 +268,7 @@ function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: numbe
       </div>
       <p className="muted pipeline-hint">노드를 누르면 그 단계가 만든 결과를 볼 수 있습니다.</p>
 
-      {focus && <StageDetail stage={focus} state={states[focus]} projectId={projectId} />}
+      {focus && <StageDetail stage={focus} state={states[focus]} projectId={projectId} reviewId={reviewId} />}
     </section>
   );
 }
