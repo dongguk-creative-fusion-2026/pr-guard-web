@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { LogoutButton } from "@/components/LogoutButton";
 import { api, ApiError, type Project } from "@/lib/api";
 import { formatTime, timeAgo } from "@/lib/format";
 import { buildQueue, LANE_META, LANES, type Lane, type QueueStats } from "@/lib/queue";
@@ -54,6 +55,9 @@ export default async function Home() {
         <Link href="/" className="pbar-brand">
           <Logo /> PR Guard
         </Link>
+        <div className="pbar-right">
+          <LogoutButton />
+        </div>
       </header>
       <main className="home">
         <div className="home-head">
