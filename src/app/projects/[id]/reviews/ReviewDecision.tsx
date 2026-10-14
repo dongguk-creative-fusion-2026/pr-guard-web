@@ -6,6 +6,8 @@ import { CATEGORY_LABEL, fileName, formatTime, shortMethod, shortSha, timeAgo, V
 import { computeImpact, type Impact } from "@/components/graph/impact";
 import { groundingOf, hasGrounding, kindLabel, LAYER_META, LAYER_ORDER, layerOf, MARK_META } from "@/lib/grounding";
 import { computeDelegation, touchedZones, ZONE_META, type FileZone, type Zone } from "@/lib/delegation";
+import { pickSelection, seconds } from "@/lib/testSelection";
+import type { TestSelection } from "@/lib/api";
 import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { RerunButton } from "../RerunButton";
@@ -161,6 +163,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                   </Link>
                 </div>
               )}
+              <TestSelectionCard selection={pickSelection([], events)} href={`${base}/tests`} />
               {graph?.graph && context && (
                 <ZoneCard
                   zones={touchedZones(computeDelegation(graph.graph), (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)))}
@@ -554,6 +557,53 @@ function ZoneCard({ zones, projectId }: { zones: FileZone[]; projectId: number }
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** 영향 테스트 선택 요약: 몇 개를 돌리고 몇 개를 걸렀는지 (실행 검증이 돈 리뷰만) */
+function TestSelectionCard({ selection: s, href }: { selection: TestSelection | null; href: string }) {
+  if (!s || s.mode === "OFF") return null;
+  const full = s.mode === "FULL";
+  const run = full || s.shadow ? s.impacted : s.run;
+  return (
+    <div className="dv-card ts-card">
+      <h3>
+        테스트 선택
+        <span className="dv-h-link">{full ? "전체 실행" : s.shadow ? "그림자 모드" : "영향 있는 것만"}</span>
+      </h3>
+      <div className="dv-stats">
+        <div>
+          <b>{s.total}</b>
+          <span>전체</span>
+        </div>
+        <div>
+          <b className="ts-c-run">{run}</b>
+          <span>{full || s.shadow ? "영향" : "실행"}</span>
+        </div>
+        <div>
+          <b className="ts-c-skip">{s.total - run}</b>
+          <span>{full || s.shadow ? "거를 수 있음" : "걸러짐"}</span>
+        </div>
+      </div>
+      {s.total > 0 && (
+        <div className="ts-bar small" aria-hidden="true">
+          <i className="run" style={{ flex: Math.max(run, 0.0001) }} />
+          <i className="skip" style={{ flex: Math.max(s.total - run, 0.0001) }} />
+        </div>
+      )}
+      <p className="dv-note ts-card-note">
+        {full
+          ? s.fullReasons[0]
+          : s.shadow
+            ? "전체를 돌리며 선택이 놓친 실패가 없는지 확인"
+            : s.skippedSeconds > 0
+              ? `약 ${seconds(s.skippedSeconds)} 절약`
+              : "바뀐 메서드를 지나가는 테스트만"}
+      </p>
+      <Link href={href} className="dv-btn">
+        돌린 테스트 · 걸러진 테스트
+      </Link>
     </div>
   );
 }

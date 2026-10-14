@@ -13,6 +13,7 @@ PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사�
 | PR 이력 · 대기열 | `/projects/{id}/prs` | 병목 숫자, 차단 · 확인 필요 · 자동 통과 칸 |
 | PR 판단 | `/projects/{id}/prs/{number}` | 판정 → 영향 시티(그 리뷰의 장면 자동 재생) → 근거가 있는 지적 → 사람이 확인할 지적, 옆에 영향 범위 · 위임 구역. 리뷰 과정(파이프라인) · 판정에서 뺀 지적 · 분석 재료 · PR 코멘트는 접어 둠 |
 | 근거 층 · 영향 시티 · 영향 그래프 | `/projects/{id}/reviews/{reviewId}/layers` · `/city` · `/impact` | 전체 화면 보기 |
+| 테스트 선택 | `/projects/{id}/reviews/{reviewId}/tests` | 영향 테스트 선택을 장면으로: 테스트 무더기 → 바뀐 메서드가 켜짐 → 영향 있는 테스트만 실행 열로 모이고 나머지는 꺼짐 → 선이 뻗고 실행 중인 테스트가 빛남 → 통과 · 회귀. 진행 중이면 실시간, 끝났으면 다시 보기. 아래에 실행 · 걸러진 테스트와 이유, 아낀 시간, 전체 실행 이유 · 그림자 모드 확인 |
 | 커밋 이력 | `/projects/{id}/commits` | 코드 시티 + 커밋 목록(시간 여행). `?tab=graph` 커밋 그래프(모든 브랜치의 갈래 · 병합), `hotspots` 핫스팟, `coupling` 숨은 결합. `?file=` · `?t=` · `?mode=` |
 | 코드 그래프 | `/projects/{id}/graph` | 함수 단위 그래프 (점 = 함수, 상자 = 파일, 색 = 코드 시티와 같은 구조 구역). `?file=` · `?fn=`, `?runtime=1` 런타임 오버레이 |
 | 에이전트 규칙 | `/projects/{id}/agents` | 레포의 AGENTS.md 상태, 분석 기반 초안, 반복된 실수 → 규칙 제안, 초안을 PR 로 |
