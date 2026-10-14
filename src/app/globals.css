@@ -6900,3 +6900,222 @@ a.cg-ref.pr:hover {
     animation: none;
   }
 }
+
+/* 테스트 신뢰도 (변이 · flaky · 정적) */
+.tr {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.tr .ts-sec-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 0;
+}
+.tr-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.tr-stat {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.tr-stat b {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tr-stat span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tr-stat.ok b {
+  color: var(--ok);
+}
+.tr-stat.warn b {
+  color: var(--warn);
+}
+.tr-stat.bad b {
+  color: var(--danger);
+}
+.tr-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tr-method {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.tr-method-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.tr-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tr-count .bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+.tr-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin: 10px 0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.tr-bar i.k {
+  background: var(--ok);
+}
+.tr-bar i.s {
+  background: var(--danger);
+}
+.tr-bar i.u {
+  background: #3a3a44;
+}
+.tr-mutants {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.tr-mutants li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.tr-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.tr-mutants li.k .tr-icon {
+  border: 2px solid var(--ok);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent);
+}
+.tr-mutants li.s .tr-icon {
+  background: var(--danger);
+}
+.tr-mutants li.u .tr-icon {
+  background: #3a3a44;
+}
+.tr-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-who {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.tr-mutants li.s .tr-who {
+  color: var(--danger);
+}
+.tr-mutants li.k .tr-who {
+  color: var(--ok);
+}
+.tr-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.ts-chip.bad {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+/* 변이 장면: 날아가는 버그 · 방어막 · 놓친 버그 칸 */
+.tf-stage.mutating {
+  padding-bottom: 92px;
+}
+.tf-bugs {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.tf-bug-dot {
+  fill: var(--danger);
+  filter: drop-shadow(0 0 4px var(--danger));
+}
+.tf-shield {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 3;
+}
+.tf-bin {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+}
+.tf-bin b {
+  font-size: 20px;
+  color: var(--fg-2);
+}
+.tf-bin.has {
+  border-color: color-mix(in srgb, var(--danger) 60%, var(--border));
+  box-shadow: 0 0 24px -8px var(--danger);
+}
+.tf-bin.has b {
+  color: var(--danger);
+}
+.tf-bug {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.tf-k.shield {
+  border: 2px solid var(--ok);
+  border-radius: 50%;
+}
+@media (max-width: 720px) {
+  .tr-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tr-mutants li {
+    grid-template-columns: 14px minmax(0, 1fr);
+  }
+  .tr-who {
+    grid-column: 2;
+  }
+}
