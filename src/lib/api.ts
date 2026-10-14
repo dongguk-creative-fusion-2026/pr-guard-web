@@ -380,6 +380,17 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+/**
+ * 404 (예전 백엔드에 없는 기능 · 아직 기록 없음) 만 빈 값으로 바꾼다.
+ * 연결 실패 · 5xx 는 그대로 던져서 "데이터 없음" 으로 가려지지 않게 한다 (error.tsx 가 받는다).
+ */
+function orIfMissing<T, F>(promise: Promise<T>, fallback: F): Promise<T | F> {
+  return promise.catch((e) => {
+    if (e instanceof ApiError && e.status === 404) return fallback;
+    throw e;
+  });
+}
+
 export const api = {
   listProjects: () => call<Project[]>("/api/projects"),
   getProject: (id: number) => call<Project>(`/api/projects/${id}`),
@@ -404,21 +415,22 @@ export const api = {
       body: JSON.stringify({ commentEnabled, majorThreshold, execEnabled }),
     }),
   /** 백엔드가 지원하지 않으면 null */
-  getExecution: () => call<ExecutionInfo>(`/api/execution`).catch(() => null),
+  getExecution: () => orIfMissing(call<ExecutionInfo>(`/api/execution`), null),
   finishOnboarding: (id: number) => call<Project>(`/api/projects/${id}/onboarded`, { method: "POST" }),
   /** 런타임 기록이 없거나 백엔드가 아직 지원하지 않으면 null */
   getRuntime: (id: number) =>
-    call<ProjectRuntime | undefined>(`/api/projects/${id}/runtime`)
-      .then((r) => r ?? null)
-      .catch(() => null),
-  /** 리뷰 단계 기록 (스트림이 아니라 한 번에). 실패하면 빈 목록 */
+    orIfMissing(call<ProjectRuntime | undefined>(`/api/projects/${id}/runtime`), null).then((r) => r ?? null),
+  /** 리뷰 단계 기록 (스트림이 아니라 한 번에). 백엔드가 지원하지 않으면 빈 목록 */
   getReviewEvents: (reviewId: number) =>
-    call<{ stage: string; status: string; data: Record<string, unknown> | null }[]>(`/api/reviews/${reviewId}/events`, {
-      headers: { Accept: "application/json" },
-    }).catch(() => []),
+    orIfMissing(
+      call<{ stage: string; status: string; data: Record<string, unknown> | null }[]>(`/api/reviews/${reviewId}/events`, {
+        headers: { Accept: "application/json" },
+      }),
+      [],
+    ),
   getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
   /** 백엔드가 지원하지 않으면 빈 목록 */
-  getLessons: (id: number) => call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`).catch(() => [] as Lesson[]),
+  getLessons: (id: number) => orIfMissing(call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`), [] as Lesson[]),
   createAgentsPull: (id: number, content: string) =>
     call<{ url: string }>(`/api/projects/${id}/agents-md/pull`, { method: "POST", body: JSON.stringify({ content }) }),
   rerun: (id: number, number: number) =>
