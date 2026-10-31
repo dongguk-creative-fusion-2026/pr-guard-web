@@ -7,7 +7,6 @@ export type StageId =
   | "INDEX_HEAD"
   | "METHOD_DIFF"
   | "HISTORY"
-  | "CHECK_A"
   | "CHECK_B"
   | "CHECK_C"
   | "CHECK_D"
@@ -58,7 +57,6 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   INDEX_HEAD: { label: "head 인덱스", hint: "타입 · 메서드 · 호출" },
   METHOD_DIFF: { label: "메서드 비교", hint: "바뀐 메서드 · 호출부" },
   HISTORY: { label: "git 이력", hint: "동시 변경 · blame" },
-  CHECK_A: { label: "A · 의도 대비", hint: "PR 설명 ↔ 변경" },
   CHECK_B: { label: "B · 변경 영향", hint: "호출부 · 참조" },
   CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿 · Semgrep" },
   CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락" },
@@ -91,7 +89,6 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   INDEX_HEAD: { x: 2 * COL, y: 2.6 * ROW },
   METHOD_DIFF: { x: 3 * COL, y: 2 * ROW },
   HISTORY: { x: 4 * COL, y: 2 * ROW },
-  CHECK_A: { x: 5 * COL, y: 0 },
   CHECK_B: { x: 5 * COL, y: ROW },
   CHECK_C: { x: 5 * COL, y: 2 * ROW },
   CHECK_D: { x: 5 * COL, y: 3 * ROW },
@@ -128,9 +125,8 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   INDEX_HEAD: { x: VCOL / 2, y: 2 * VROW },
   METHOD_DIFF: { x: 0, y: 3 * VROW },
   HISTORY: { x: 0, y: 4 * VROW },
-  CHECK_A: { x: -VCOL, y: 5 * VROW },
-  CHECK_B: { x: 0, y: 5 * VROW },
-  CHECK_C: { x: VCOL, y: 5 * VROW },
+  CHECK_B: { x: -VCOL / 2, y: 5 * VROW },
+  CHECK_C: { x: VCOL / 2, y: 5 * VROW },
   CHECK_D: { x: -VCOL / 2, y: 6 * VROW },
   LLM: { x: VCOL / 2, y: 6 * VROW },
   // 실행 검증 레인은 오른쪽 열에
@@ -156,12 +152,10 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["INDEX_BASE", "METHOD_DIFF"],
   ["INDEX_HEAD", "METHOD_DIFF"],
   ["METHOD_DIFF", "HISTORY"],
-  ["HISTORY", "CHECK_A"],
   ["HISTORY", "CHECK_B"],
   ["HISTORY", "CHECK_C"],
   ["HISTORY", "CHECK_D"],
   ["HISTORY", "LLM"],
-  ["CHECK_A", "GROUND"],
   ["CHECK_B", "GROUND"],
   ["CHECK_C", "GROUND"],
   ["CHECK_D", "GROUND"],
@@ -236,7 +230,6 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
       ];
     case "HISTORY":
       return [`커밋 ${data.commits}`, `동시 변경 ${data.coChanges?.length ?? 0}`];
-    case "CHECK_A":
     case "CHECK_B":
     case "CHECK_C":
     case "CHECK_D":
