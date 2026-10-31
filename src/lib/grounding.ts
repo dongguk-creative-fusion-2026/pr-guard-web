@@ -33,6 +33,7 @@ const KIND_LABEL: Record<string, string> = {
   SECURITY: "보안",
   DATA: "데이터",
   INTENT: "의도 불일치",
+  CONTRACT_CONFLICT: "기존 코드와 충돌",
   OTHER: "기타",
 };
 

@@ -49,7 +49,6 @@ PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사�
 
 | 화면 | 주소 | 내용 |
 |---|---|---|
-| 입구 인증 | `/login` | `ACCESS_TOKEN` 이 있으면 모든 화면이 이 토큰 입력 뒤에 있다. 맞으면 30일 유지, 상단 바에 로그아웃 |
 | 홈 | `/` | 레포 등록, 프로젝트 목록(구성 · 열린 PR · 볼 PR · 자동 통과 · 판정 분포 · 마지막 확인) |
 | 입구 | `/projects/{id}` | 화면 전체에 코드 시티를 깔고, 사람이 볼 PR(머지 막힘 · 확인 필요)이 바꾼 건물을 판정 색으로 세운다. 오른쪽에 PR 이력 · 커밋 이력 패널. 진행 중인 리뷰는 **리뷰 장면**으로 실시간 재생, 아니면 보안 지적이 있는 최근 리뷰를 다시 보기. "실행 검증 미리보기"(예시 데이터) |
 | PR 이력 · 대기열 | `/projects/{id}/prs` | 병목 숫자, 차단 · 확인 필요 · 자동 통과 칸 |
@@ -132,7 +131,6 @@ src/
 | 변수 | 설명 |
 |---|---|
 | `API_BASE_URL` | pr-guard-api 주소 (기본 `http://localhost:8080`). 서버에서 실행할 때 읽는다 |
-| `ACCESS_TOKEN` | 있으면 화면 전체가 토큰 입력(`/login`) 뒤로 간다. 팀원에게 나눠 주는 값. 바꾸면 모두 다시 입력해야 한다 |
 | `API_TOKEN` | pr-guard-api 의 `API_TOKEN` 과 같은 값. 서버에서 백엔드를 부를 때 `X-Api-Token` 으로 보낸다 (브라우저로 나가지 않음) |
 
 ## 로컬 실행
@@ -142,6 +140,32 @@ npm install
 API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
+## GuardDog 검사 결과
+
+PR 상세 화면은 `GET /api/reviews/{id}`의 `context.guarddog`를 표시한다. 기존 기록에 필드가 없으면
+완료된 CHECK_C/VERDICT 이벤트에서 찾고, 둘 다 없으면 `검사 기록 없음`으로 표시한다.
+검사 완료·일부 미완료·미완료·꺼짐·검사 대상 없음을 구분하며, 패키지를 펼치면 선언 파일,
+위험도·규칙·설명과 실패·생략 원인을 볼 수 있다. 집계는 패키지 이름·버전 단위다.
+
+지원 범위는 이번 PR에 추가·변경된 npm/PyPI 직접 의존성이다. 위험 신호가 0건이어도 검사가
+미완료이면 재검사가 필요하다고 안내한다. 열린 PR의 `전체 다시 검사`는 기존 다시 리뷰 API로
+새 리뷰를 요청한다. 패키지 하나만 검사하는 기능은 아니다. 실시간/다시보기의 보안·판정 단계에도
+동일한 결과를 표시하며, 기존 Sonar/Semgrep 결과는 함께 유지한다.
+
+브랜치는 로컬 실행에 제약이 없다. `feat/guarddog-ui`에서 API를 실행하고 `API_BASE_URL`을
+그 주소로 지정하면 배포·Push 없이 브라우저에서 테스트할 수 있다. PowerShell 예시:
+
+```powershell
+npm ci
+$env:API_BASE_URL = 'http://localhost:8080'
+npm run dev -- --hostname 127.0.0.1
+```
+
+`http://localhost:3000`에서 실제 프로젝트의 PR을 열어 확인한다. API의 GuardDog 설정을 켜고 새
+리뷰를 완료해야 새 검사 기록이 생긴다. 기존 리뷰를 열기만 해서는 검사를 실행하지 않는다.
+API_TOKEN이 필요한 서버는 같은 값을 웹 서버 환경변수에 설정한다. `NEXT_PUBLIC_` 변수에 넣지 않는다.
+기본 회귀 검증은 `npm test`, 타입·배포 빌드 검증은 `npm run build`로 실행한다.
+
 ## Vercel 배포
 
-Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `ACCESS_TOKEN`, `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.
+Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.

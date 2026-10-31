@@ -3,17 +3,18 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-type Section = "pr" | "commit" | null;
+type Section = "pr" | "commit" | "rules" | null;
 
-/** 지금 주소가 어느 갈래인지: PR 이력(대기열 · PR · 리뷰) / 커밋 이력(코드 시티 · 그래프 · 에이전트 규칙) */
+/** 지금 주소가 어느 갈래인지: PR 이력(대기열 · PR · 리뷰) / 커밋 이력(코드 시티 · 그래프 · 에이전트 규칙) / 규칙 지도 */
 function sectionOf(path: string, base: string): Section {
   const rest = path.slice(base.length);
   if (/^\/(prs|reviews)(\/|$)/.test(rest)) return "pr";
   if (/^\/(commits|insights|graph|agents)(\/|$)/.test(rest)) return "commit";
+  if (/^\/rules(\/|$)/.test(rest)) return "rules";
   return null;
 }
 
-/** 상단 바 가운데: PR 이력 | 커밋 이력 전환과 지금 갈래의 하위 탭 */
+/** 상단 바 가운데: PR 이력 | 커밋 이력 | 규칙 지도 전환과 지금 갈래의 하위 탭 */
 export function ProjectNav({ id }: { id: number }) {
   const path = usePathname();
   const params = useSearchParams();
@@ -40,6 +41,9 @@ export function ProjectNav({ id }: { id: number }) {
         </Link>
         <Link href={`${base}/commits`} className={section === "commit" ? "active" : ""} role="tab" aria-selected={section === "commit"}>
           커밋 이력
+        </Link>
+        <Link href={`${base}/rules`} className={section === "rules" ? "active" : ""} role="tab" aria-selected={section === "rules"}>
+          규칙 지도
         </Link>
       </div>
       <Link href={`${base}/invariants`} className={rest === "/invariants" ? "active" : ""}>정합성 규칙</Link>

@@ -18,6 +18,7 @@ import {
   type StageId,
 } from "./stages";
 import { usePipelineEvents } from "./usePipelineEvents";
+import { guarddogNeedsAttention } from "@/lib/guarddog";
 
 /** 실행 검증 레인 뒤에 까는 묶음 상자 (누를 수 없는 배경) */
 function LaneNode({ data }: { data: { width: number; height: number; label: string } }) {
@@ -129,8 +130,11 @@ function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: numbe
     return () => clearInterval(timer);
   }, [running]);
 
-  // 선택이 없으면 마지막으로 움직인 단계를 따라간다
-  const lastStage = [...visible].reverse().find((e) => e.stage !== "REVIEW")?.stage as
+  // 선택이 없으면 마지막으로 움직인 단계를 따라간다.
+  // 그래프에 없는 단계(예: 노드를 뺀 CHECK_A)는 건너뛴다. API 는 여전히 보내므로 그대로 고르면 states 에 없어 터진다
+  const lastStage = [...visible]
+    .reverse()
+    .find((e) => GRAPH_STAGES.includes(e.stage as Exclude<StageId, "REVIEW">))?.stage as
     | Exclude<StageId, "REVIEW">
     | undefined;
   const focus = selected ?? lastStage ?? null;
@@ -267,6 +271,9 @@ function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: numbe
         </AnimatePresence>
       </div>
       <p className="muted pipeline-hint">노드를 누르면 그 단계가 만든 결과를 볼 수 있습니다.</p>
+      {verdict && guarddogNeedsAttention(states.VERDICT.data?.guarddog) && (
+        <p className="notice">의존성 검증 미완료: 실패 원인을 확인하고 다시 리뷰하세요.</p>
+      )}
 
       {focus && <StageDetail stage={focus} state={states[focus]} projectId={projectId} reviewId={reviewId} />}
     </section>

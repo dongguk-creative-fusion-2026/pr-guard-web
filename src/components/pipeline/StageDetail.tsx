@@ -5,10 +5,14 @@ import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
+import { SonarStageDetail } from "./SonarDetail";
+import { GuardDogPanel } from "@/components/guarddog/GuardDogPanel";
+import { guarddogNeedsAttention } from "@/lib/guarddog";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
+import { countByPurpose, semgrepInfo } from "@/lib/semgrep";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import Link from "next/link";
-import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
+import { durationMs, STAGE_META, type StageData, type StageId, type StageState } from "./stages";
 
 type GroundView = {
   severity: string;
@@ -19,7 +23,49 @@ type GroundView = {
   layers: { layer: GroundLayerId; mark: GroundMark; note: string }[];
 };
 
-type FindingView = { severity: string; ruleId: string; title: string; file: string | null; line: number | null };
+type FindingView = {
+  severity: string;
+  ruleId: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  evidence?: string | null;
+};
+
+type ConflictMethodView = {
+  id: string;
+  file: string;
+  snippets: { ref: string; role: string; side: string; symbol: string; file: string; line: number; endLine: number }[];
+};
+
+/** 기존 코드 조각 종류 (백엔드 ContractContext.Role) */
+const SNIPPET_ROLE: Record<string, string> = {
+  BASE_BODY: "PR 전 본문",
+  DROPPED_CALLEE: "안 부르게 된 메서드",
+  NEW_CALLEE: "새로 부르는 메서드",
+  LOST_EXCEPTION: "이제 안 던지는 예외",
+  CALLER: "부르는 곳",
+  TEST: "테스트",
+  RULE: "규칙 지도",
+};
+
+/** 규칙 종류 (백엔드 Rule.Kind) */
+const RULE_KIND: Record<string, string> = {
+  THROWS: "예외",
+  RETURNS_NULL: "null 반환",
+  GUARD: "검사 호출",
+  AUTH: "권한",
+  ORDERED: "정렬",
+  ATOMIC_UPDATE: "원자적 갱신",
+  FIELD: "필드 제약",
+  CONVENTION: "관례",
+};
+
+function shortId(id: string): string {
+  const hash = id.indexOf("#");
+  const type = hash < 0 ? id : id.slice(0, hash);
+  return type.slice(type.lastIndexOf(".") + 1) + (hash < 0 ? "" : id.slice(hash));
+}
 
 function fileName(path: string | null | undefined): string {
   return path ? path.slice(path.lastIndexOf("/") + 1) : "-";
@@ -108,6 +154,8 @@ export function StageDetail({
         </>
       )}
 
+      {d && stage === "IMPACT" && <GraphImpactDetail d={d} />}
+
       {d && stage === "HISTORY" && (
         <>
           <p className="muted">최근 커밋 {d.commits}개에서 이번에 바뀐 파일과 늘 함께 바뀌어 온 대상</p>
@@ -154,8 +202,85 @@ export function StageDetail({
         </>
       )}
 
-      {d && (stage.startsWith("CHECK_") || stage === "LLM") && (
+      {d && stage === "RULE_MAP" && (
         <>
+          <p className="muted">
+            base <code>{String(d.baseSha ?? "-").slice(0, 7)}</code> · 규칙 {d.rules}개{d.baseCached ? " (저장해 둔 지도)" : " (이번에 만듦)"}
+            {d.latestSha && d.latestSha !== d.baseSha && (
+              <>
+                {" "}· 지금 기본 브랜치 <code>{String(d.latestSha).slice(0, 7)}</code>
+              </>
+            )}
+          </p>
+          {d.byKind && (
+            <p className="muted">
+              {Object.entries(d.byKind as Record<string, number>)
+                .map(([k, n]) => `${RULE_KIND[k] ?? k} ${n}`)
+                .join(" · ")}
+            </p>
+          )}
+          {(d.conventions ?? []).length > 0 && (
+            <>
+              <h3>관례</h3>
+              <ul>
+                {(d.conventions as { statement: string; support: number; total: number }[]).map((c) => (
+                  <li key={c.statement}>
+                    {c.statement}{" "}
+                    <span className="muted">
+                      ({c.support}/{c.total})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {((d.added ?? []).length > 0 || (d.removed ?? []).length > 0) && (
+            <>
+              <h3>PR 을 만든 뒤 기본 브랜치에서 바뀐 규칙</h3>
+              <ul>
+                {(d.removed as string[]).map((r) => (
+                  <li key={`-${r}`}>
+                    <span className="muted">사라짐</span> {r}
+                  </li>
+                ))}
+                {(d.added as string[]).map((r) => (
+                  <li key={`+${r}`}>
+                    <span className="muted">생김</span> {r}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+
+      {d && stage === "LLM_CONFLICT" && (d.methods ?? []).length > 0 && (
+        <>
+          <h3>바뀐 메서드가 기대던 기존 코드</h3>
+          {(d.methods as ConflictMethodView[]).map((m) => (
+            <div key={m.id}>
+              <p>
+                <code>{shortId(m.id)}</code>
+              </p>
+              <ul>
+                {m.snippets.map((s) => (
+                  <li key={s.ref}>
+                    <span className="muted">[{s.ref}]</span> {SNIPPET_ROLE[s.role] ?? s.role} <code>{shortId(s.symbol)}</code>{" "}
+                    <span className="muted">
+                      ({s.side} · {fileName(s.file)}:{s.line}
+                      {s.endLine > s.line && `-${s.endLine}`})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
+
+      {d && (stage.startsWith("CHECK_") || stage === "LLM" || stage === "LLM_CONFLICT") && (
+        <>
+          {stage === "CHECK_C" && state.status === "DONE" && <GuardDogPanel report={d.guarddog ?? null} />}
           {d.analyzers && <p className="muted">검사기: {(d.analyzers as string[]).join(", ")}</p>}
           {d.model && (
             <p className="muted">
@@ -163,24 +288,61 @@ export function StageDetail({
               {d.dropped > 0 && ` · 변경 파일 밖을 가리킨 지적 ${d.dropped}건 제외`}
             </p>
           )}
+          {(() => {
+            const semgrep = ((d.findings ?? []) as FindingView[]).map(semgrepInfo).filter((s) => s !== null);
+            return (
+              semgrep.length > 0 && (
+                <p className="muted semgrep-summary">
+                  Semgrep{" "}
+                  {countByPurpose(semgrep).map(([purpose, n]) => (
+                    <span key={purpose} className="semgrep-chip" data-purpose={purpose}>
+                      {purpose} {n}
+                    </span>
+                  ))}
+                </p>
+              )
+            );
+          })()}
           {(d.findings ?? []).length === 0 ? (
-            <div className="empty">지적 사항 없음</div>
+            <div className="empty">{stage === "CHECK_C" && state.status !== "DONE"
+              ? state.status === "RUNNING" ? "보안 검사 진행 중입니다." : "보안 검사 결과가 아직 없습니다."
+              : stage === "CHECK_C" && guarddogNeedsAttention(d.guarddog)
+                ? "발견된 지적은 없지만 의존성 검증이 미완료되었습니다."
+                : "지적 사항 없음"}</div>
           ) : (
             <ul className="finding-list">
-              {(d.findings as FindingView[]).map((f, i) => (
-                <motion.li
-                  key={`${f.ruleId}-${i}`}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <span className={`sev ${f.severity}`}>{f.severity}</span> {f.title}{" "}
-                  <span className="muted">
-                    {fileName(f.file)}
-                    {f.line != null && `:${f.line}`}
-                  </span>
-                </motion.li>
-              ))}
+              {(d.findings as FindingView[]).map((f, i) => {
+                const sg = semgrepInfo(f);
+                return (
+                  <motion.li
+                    key={`${f.ruleId}-${i}`}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <span className={`sev ${f.severity}`}>{f.severity}</span>{" "}
+                    {sg ? (
+                      <>
+                        <span className="semgrep-chip" data-purpose={sg.purpose}>
+                          {sg.purpose}
+                        </span>{" "}
+                        {sg.rule}
+                      </>
+                    ) : (
+                      f.title
+                    )}{" "}
+                    <span className="muted">
+                      {fileName(f.file)}
+                      {f.line != null && `:${f.line}`}
+                    </span>
+                    {sg?.fix && (
+                      <div className="semgrep-fix">
+                        수정 제안 <code>{sg.fix}</code>
+                      </div>
+                    )}
+                  </motion.li>
+                );
+              })}
             </ul>
           )}
         </>
@@ -249,6 +411,8 @@ export function StageDetail({
           )}
         </>
       )}
+
+      {d && stage === "EXEC_SONAR" && <SonarStageDetail data={d} />}
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 
@@ -342,12 +506,16 @@ export function StageDetail({
       )}
 
       {d && stage === "VERDICT" && (
-        <p>
-          BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor}
-          {d.refuted ? ` (인덱스와 어긋난 지적 ${d.refuted}건 제외)` : ""} → <strong>{state.message}</strong>
-          <br />
-          <span className="muted">판정 규칙: BLOCKER 1건 이상 → 머지 비권장, MAJOR 1건 이상 → 수정 후 머지</span>
-        </p>
+        <div>
+          <p>
+            BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor}
+            {d.refuted ? ` (인덱스와 어긋난 지적 ${d.refuted}건 제외)` : ""} → <strong>{state.message}</strong>
+            <br />
+            <span className="muted">판정 규칙: BLOCKER → 머지 비권장, MAJOR 기준 충족 또는 의존성 검증 미완료 → 수정 후 머지</span>
+          </p>
+          {d.reason && <p className="notice">{d.reason}</p>}
+          {d.guarddog && <GuardDogPanel report={d.guarddog} />}
+        </div>
       )}
 
       {d && stage === "PUBLISH" && (
@@ -361,5 +529,69 @@ export function StageDetail({
         </p>
       )}
     </motion.div>
+  );
+}
+
+type ImpactFn = { file: string; name: string; line: number; depth: number; via: string | null; confirmed: boolean };
+
+/** GitNexus 호출 그래프로 따라간 변경 영향: 바뀐 함수 → 부르는 함수를 단계별로 */
+function GraphImpactDetail({ d }: { d: StageData }) {
+  const changed = (d.changed ?? []) as ImpactFn[];
+  const impacted = (d.impacted ?? []) as ImpactFn[];
+  const depths = [...new Set(impacted.map((f) => f.depth))].sort((a, b) => a - b);
+  return (
+    <>
+      <p className="muted">
+        기본 브랜치 <code>{String(d.commitSha ?? "").slice(0, 7)}</code> 의 GitNexus 호출 그래프에서 바뀐 함수를 부르는
+        함수를 따라갔습니다. 언어를 가리지 않고, &quot;인덱스로도 확인&quot;은 Java 인덱스가 같은 호출을 찾은 것입니다.
+        {d.baseMatches === false && " 그래프 커밋이 이 PR 의 base 와 달라 줄 위치가 조금 어긋날 수 있습니다."}
+        {d.complete === false && " 그래프가 레포 일부만 담고 있어 빠진 호출이 있을 수 있습니다."}
+      </p>
+      <div className="stats">
+        {[
+          ["바뀐 함수", changed.length],
+          ["영향 함수", impacted.length],
+          ["고치지 않은 파일", (d.impactedFiles ?? []).length],
+          ["인덱스로도 확인", d.confirmed ?? 0],
+        ].map(([k, v]) => (
+          <div key={k} className="stat">
+            <div className="stat-value">{v}</div>
+            <div className="muted">{k}</div>
+          </div>
+        ))}
+      </div>
+      {changed.length > 0 && (
+        <>
+          <h4>바뀐 함수</h4>
+          <ul className="impact-fns">
+            {changed.map((f) => (
+              <li key={`${f.file}#${f.name}:${f.line}`}>
+                <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {depths.map((depth) => (
+        <div key={depth}>
+          <h4>{depth}단계 — 부르는 함수</h4>
+          <ul className="impact-fns">
+            {impacted
+              .filter((f) => f.depth === depth)
+              .map((f) => (
+                <li key={`${f.file}#${f.name}:${f.line}`}>
+                  <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+                  {f.via && <span className="muted"> → {f.via.split("#").pop()}</span>}
+                  {f.confirmed && <span className="impact-confirmed">인덱스로도 확인</span>}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
+      {impacted.length === 0 && <div className="empty">이 변경을 부르는 함수가 그래프에 없음</div>}
+      {(d.unmapped ?? []).length > 0 && (
+        <p className="muted">그래프에 없는 바뀐 파일(새 파일 · 함수 밖 변경): {(d.unmapped as string[]).map(fileName).join(", ")}</p>
+      )}
+    </>
   );
 }

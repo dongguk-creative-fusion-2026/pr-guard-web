@@ -1,6 +1,7 @@
 import "server-only";
 import type { InvariantCandidate, InvariantInterpretation, InvariantRun } from "./invariants";
 export type { InvariantCandidate, InvariantRun } from "./invariants";
+import type { GuardDogReport } from "./guarddog";
 
 // 백엔드(pr-guard-api) 주소. 브라우저가 아니라 Next 서버에서만 호출하므로 CORS 설정이 필요 없다.
 export const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
@@ -71,6 +72,29 @@ export type PullRequest = {
   updatedAt: string;
   latestReviewId: number | null;
   latestReviewStatus: ReviewStatus | null;
+};
+
+/** 변경 영향의 함수 하나. depth 0 = 바뀐 함수, 1 = 그 함수를 부르는 함수 … */
+export type GraphImpactFn = {
+  file: string;
+  name: string;
+  line: number;
+  depth: number;
+  /** 바로 앞 단계 함수 ("파일#이름") */
+  via: string | null;
+  /** Java 인덱스도 같은 호출을 찾았나 */
+  confirmed: boolean;
+};
+
+export type GraphImpact = {
+  commitSha: string | null;
+  baseMatches: boolean;
+  complete: boolean;
+  changed: GraphImpactFn[];
+  impacted: GraphImpactFn[];
+  impactedFiles: string[];
+  unmapped: string[];
+  truncated: boolean;
 };
 
 export type ReviewStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "SUPERSEDED";
@@ -174,6 +198,8 @@ export type FileChange = {
 };
 
 export type AnalysisContext = {
+  /** GuardDog 도입 전 리뷰에는 없다. 검사 미완료와 위험 신호는 별도로 기록한다. */
+  guarddog?: GuardDogReport | null;
   baseSha: string | null;
   headSha: string;
   baseIndex: IndexStats;
@@ -186,6 +212,8 @@ export type AnalysisContext = {
   blame: { file: string; line: number; sha: string; author: string; time: number; summary: string }[];
   notes: string[];
   elapsedMs: number;
+  /** GitNexus 호출 그래프로 따라간 변경 영향 (예전 리뷰 · 그래프 없는 프로젝트에는 없다) */
+  graphImpact?: GraphImpact | null;
 };
 
 export type ReviewDetail = {
@@ -459,6 +487,41 @@ function orIfMissing<T, F>(promise: Promise<T>, fallback: F): Promise<T | F> {
   });
 }
 
+/** 규칙 지도의 규칙 하나 (백엔드 com.prguard.rulemap.Rule) */
+export type RuleKind = "THROWS" | "RETURNS_NULL" | "GUARD" | "AUTH" | "ORDERED" | "ATOMIC_UPDATE" | "FIELD" | "CONVENTION";
+
+export type MapRule = {
+  id: string;
+  kind: RuleKind;
+  origin: "CODE" | "CONVENTION";
+  /** 메서드 id · 타입 FQN · 타입FQN.필드 · 관례 키 */
+  subject: string;
+  statement: string;
+  detail: string | null;
+  file: string | null;
+  line: number;
+  /** 관례: 따르는 곳 / 해당하는 곳 */
+  support: number;
+  total: number;
+  members: string[];
+  /** 관례: 같은 종류인데 지키지 않는 곳 (예전 지도에는 없다) */
+  outliers?: string[];
+};
+
+/** 기본 브랜치 끝 커밋의 규칙 지도와, 지난 지도 대비 바뀐 규칙 */
+export type RuleMapView = {
+  repo: string;
+  branch: string;
+  commitSha: string;
+  /** 저장해 둔 지도를 꺼냈나 (false 면 이번에 만듦) */
+  cached: boolean;
+  version: number;
+  rules: MapRule[];
+  previousSha: string | null;
+  added: MapRule[];
+  removed: MapRule[];
+};
+
 export const api = {
   startInvariantRun: (id: number, number: number, candidate: InvariantCandidate) =>
     call<InvariantRun>(`/api/projects/${id}/pulls/${number}/invariant-runs`, { method: "POST", body: JSON.stringify(candidate) }),
@@ -514,6 +577,8 @@ export const api = {
       [],
     ),
   getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
+  /** 백엔드가 지원하지 않으면 null */
+  getRules: (id: number) => orIfMissing(call<RuleMapView>(`/api/projects/${id}/rules`), null),
   /** 백엔드가 지원하지 않으면 빈 목록 */
   getLessons: (id: number) => orIfMissing(call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`), [] as Lesson[]),
   createAgentsPull: (id: number, content: string) =>

@@ -10,7 +10,11 @@ import { pickSelection, seconds } from "@/lib/testSelection";
 import type { TestSelection } from "@/lib/api";
 import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
+import { SonarBadge, SonarCard } from "@/components/pipeline/SonarDetail";
+import { isSonar, sonarEvidence, sonarLink, sonarStage } from "@/lib/sonar";
 import { RerunButton } from "../RerunButton";
+import { GuardDogPanel } from "@/components/guarddog/GuardDogPanel";
+import { guarddogNeedsAttention, guarddogVerdictLine, pickGuardDog } from "@/lib/guarddog";
 import { ReviewMarkdown } from "../ReviewMarkdown";
 import { ImpactCityInlineClient } from "./ImpactCityInlineClient";
 
@@ -43,6 +47,8 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
   }
   const [detail, graph, events, project, pulls, reviews] = data;
   const { review, findings: all, context } = detail;
+  const guarddog = pickGuardDog(context, events);
+  const dependencyAttention = guarddogNeedsAttention(guarddog);
   if (review.projectId !== projectId) notFound();
 
   const pull = pulls.find((p) => p.number === review.prNumber) ?? null;
@@ -123,7 +129,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                     <i />
                     {VERDICT_LABEL[review.verdict]}
                   </div>
-                  <p>{VERDICT_LINE[review.verdict]}</p>
+                  <p>{guarddogVerdictLine(review.verdict, guarddog) ?? VERDICT_LINE[review.verdict]}</p>
                   <div className="dv-counts">
                     {(["BLOCKER", "MAJOR", "MINOR"] as const).map((s) => (
                       <span key={s} className={count(s) > 0 ? "on" : ""}>
@@ -136,10 +142,15 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
 
               {review.summary && <p className="dv-summary">{review.summary}</p>}
 
+              <GuardDogPanel
+                report={guarddog}
+                action={pull?.state === "open" ? <RerunButton projectId={projectId} prNumber={review.prNumber} label="전체 다시 검사" /> : undefined}
+              />
+
               {graph?.graph && <ImpactCityInlineClient data={graph.graph} reviewId={review.id} prNumber={review.prNumber} context={context} findings={all} href={`${base}/city`} />}
 
               {findings.length === 0 ? (
-                <p className="dv-empty">지적 사항 없음</p>
+                <p className="dv-empty">{dependencyAttention ? "발견된 지적은 없지만 의존성 검증이 미완료되었습니다." : "지적 사항 없음"}</p>
               ) : (
                 <>
                   <FindingList title="확인된 지적" note="코드 인덱스 · 실행 검증이 같은 문제를 찾음" findings={confirmed} diffUrl={diffUrl} />
@@ -164,6 +175,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                 </div>
               )}
               <TestSelectionCard selection={pickSelection([], events)} href={`${base}/tests`} />
+              <SonarCard stage={sonarStage(events)} />
               {graph?.graph && context && (
                 <ZoneCard
                   zones={touchedZones(computeDelegation(graph.graph), (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)))}
@@ -238,7 +250,9 @@ function FindingList({
               <details>
                 <summary>
                   <span className={`tag ${f.severity}`}>{f.severity}</span>
-                  <span className="fl-title">{f.title}</span>
+                  <span className="fl-title">
+                    {f.title} {isSonar(f) && <SonarBadge />}
+                  </span>
                   <span className="fl-sub">
                     <span className="mono">
                       {fileName(f.file)}
@@ -249,7 +263,18 @@ function FindingList({
                 </summary>
                 <div className="fl-body">
                   <p>{f.message}</p>
-                  {f.evidence && <pre className="fl-evidence">{f.evidence}</pre>}
+                  {isSonar(f) ? (
+                    <>
+                      {sonarEvidence(f) && <pre className="fl-evidence">{sonarEvidence(f)}</pre>}
+                      {sonarLink(f) && (
+                        <a href={sonarLink(f)!} target="_blank" rel="noreferrer" className="fl-link">
+                          SonarCloud 에서 이 이슈 보기
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    f.evidence && <pre className="fl-evidence">{f.evidence}</pre>
+                  )}
                   <dl className="fl-layers">
                     {[...LAYER_ORDER].reverse().map((id) => {
                       const l = layerOf(g, id);
@@ -336,7 +361,7 @@ function FindingTable({ findings }: { findings: Finding[] }) {
               </td>
               <td>
                 {CATEGORY_LABEL[f.category]}
-                <div className="muted">{f.source === "LLM" ? "AI" : f.ruleId}</div>
+                <div className="muted">{f.source === "LLM" ? "AI" : isSonar(f) ? <SonarBadge /> : f.ruleId}</div>
               </td>
               <td>
                 <LayerChips finding={f} />
