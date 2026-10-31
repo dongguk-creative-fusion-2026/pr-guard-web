@@ -35,6 +35,19 @@ const SNIPPET_ROLE: Record<string, string> = {
   LOST_EXCEPTION: "이제 안 던지는 예외",
   CALLER: "부르는 곳",
   TEST: "테스트",
+  RULE: "규칙 지도",
+};
+
+/** 규칙 종류 (백엔드 Rule.Kind) */
+const RULE_KIND: Record<string, string> = {
+  THROWS: "예외",
+  RETURNS_NULL: "null 반환",
+  GUARD: "검사 호출",
+  AUTH: "권한",
+  ORDERED: "정렬",
+  ATOMIC_UPDATE: "원자적 갱신",
+  FIELD: "필드 제약",
+  CONVENTION: "관례",
 };
 
 function shortId(id: string): string {
@@ -168,6 +181,58 @@ export function StageDetail({
                 {(d.blameCommits as { sha: string; summary: string; file: string }[]).map((b) => (
                   <li key={b.sha}>
                     <code>{b.sha.slice(0, 7)}</code> {b.summary} <span className="muted">({fileName(b.file)})</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+
+      {d && stage === "RULE_MAP" && (
+        <>
+          <p className="muted">
+            base <code>{String(d.baseSha ?? "-").slice(0, 7)}</code> · 규칙 {d.rules}개{d.baseCached ? " (저장해 둔 지도)" : " (이번에 만듦)"}
+            {d.latestSha && d.latestSha !== d.baseSha && (
+              <>
+                {" "}· 지금 기본 브랜치 <code>{String(d.latestSha).slice(0, 7)}</code>
+              </>
+            )}
+          </p>
+          {d.byKind && (
+            <p className="muted">
+              {Object.entries(d.byKind as Record<string, number>)
+                .map(([k, n]) => `${RULE_KIND[k] ?? k} ${n}`)
+                .join(" · ")}
+            </p>
+          )}
+          {(d.conventions ?? []).length > 0 && (
+            <>
+              <h3>관례</h3>
+              <ul>
+                {(d.conventions as { statement: string; support: number; total: number }[]).map((c) => (
+                  <li key={c.statement}>
+                    {c.statement}{" "}
+                    <span className="muted">
+                      ({c.support}/{c.total})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {((d.added ?? []).length > 0 || (d.removed ?? []).length > 0) && (
+            <>
+              <h3>PR 을 만든 뒤 기본 브랜치에서 바뀐 규칙</h3>
+              <ul>
+                {(d.removed as string[]).map((r) => (
+                  <li key={`-${r}`}>
+                    <span className="muted">사라짐</span> {r}
+                  </li>
+                ))}
+                {(d.added as string[]).map((r) => (
+                  <li key={`+${r}`}>
+                    <span className="muted">생김</span> {r}
                   </li>
                 ))}
               </ul>
