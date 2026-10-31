@@ -420,6 +420,9 @@ button.small {
   color: var(--danger);
 }
 
+.stage-node.guarddog-attention { border-color: var(--warn); }
+.stage-node.guarddog-attention .stage-status { color: var(--warn); }
+
 .stage-message {
   margin-top: 2px;
   color: var(--muted);

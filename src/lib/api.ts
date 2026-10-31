@@ -1,4 +1,5 @@
 import "server-only";
+import type { GuardDogReport } from "./guarddog";
 
 // 백엔드(pr-guard-api) 주소. 브라우저가 아니라 Next 서버에서만 호출하므로 CORS 설정이 필요 없다.
 export const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
@@ -195,6 +196,8 @@ export type FileChange = {
 };
 
 export type AnalysisContext = {
+  /** GuardDog 도입 전 리뷰에는 없다. 검사 미완료와 위험 신호는 별도로 기록한다. */
+  guarddog?: GuardDogReport | null;
   baseSha: string | null;
   headSha: string;
   baseIndex: IndexStats;

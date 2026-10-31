@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { rerunReview } from "../../actions";
 
-export function RerunButton({ projectId, prNumber }: { projectId: number; prNumber: number }) {
+export function RerunButton({ projectId, prNumber, label = "다시 리뷰" }: { projectId: number; prNumber: number; label?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -23,9 +23,9 @@ export function RerunButton({ projectId, prNumber }: { projectId: number; prNumb
           })
         }
       >
-        {pending ? "요청 중…" : "다시 리뷰"}
+        {pending ? "요청 중…" : label}
       </button>
-      {message && <span className="notice">{message}</span>}
+      {message && <span className="notice" role="status">{message}</span>}
     </span>
   );
 }
