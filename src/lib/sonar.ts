@@ -1,4 +1,5 @@
-// SonarCloud 결과 (pr-guard-api SonarService). head 러너가 테스트 뒤에 스캔하고 EXEC_SONAR 단계에 지표 · Gate 를 싣는다.
+// SonarCloud 결과 (pr-guard-api SonarService). 실행 검증이 돌면 head 러너가 테스트 뒤에(커버리지 포함),
+// 아니면 GitHub Actions 가 소스만 스캔하고, EXEC_SONAR 단계에 지표 · Gate 와 누가 스캔했는지(via)를 싣는다.
 // 지적은 ruleId SONAR_ISSUE(추가한 줄의 이슈) · SONAR_GATE(Quality Gate 실패)로 오고, 근거 마지막 줄이 SonarCloud 링크다.
 
 type FindingLike = { ruleId?: string | null; evidence?: string | null };
@@ -59,6 +60,8 @@ export type SonarStage = {
 };
 
 export type SonarData = {
+  /** RUNNER: 실행 검증 head 러너 (커버리지 포함) · ACTIONS: GitHub Actions (소스만) */
+  via?: "RUNNER" | "ACTIONS";
   projectKey?: string;
   url?: string;
   gate?: string;
@@ -68,6 +71,13 @@ export type SonarData = {
   findings?: { severity: string; title: string; file: string | null; line: number | null; category: string }[];
   ms?: number;
 };
+
+/** 누가 어떻게 스캔했는지 한 줄 */
+export function viaText(via: SonarData["via"]): string {
+  if (via === "ACTIONS") return "GitHub Actions 가 PR 코드를 빌드하지 않고 소스만 스캔 (커버리지 없음)";
+  if (via === "RUNNER") return "실행 검증 head 러너가 빌드 · 테스트 뒤 JaCoCo 커버리지와 함께 스캔";
+  return "PR 분석";
+}
 
 /** 리뷰 단계 기록에서 SonarCloud 단계의 마지막 상태. 단계가 없던 리뷰면 null */
 export function sonarStage(events: { stage: string; status: string; message?: string | null; data: Record<string, unknown> | null }[]): SonarStage | null {
