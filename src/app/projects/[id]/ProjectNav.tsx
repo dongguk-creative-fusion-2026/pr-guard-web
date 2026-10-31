@@ -5,11 +5,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 type Section = "pr" | "commit" | null;
 
-/** 지금 주소가 어느 갈래인지: PR 이력(대기열 · PR · 리뷰) / 커밋 이력(코드 시티 · 그래프 · 에이전트 규칙) */
+/** 지금 주소가 어느 갈래인지: PR 이력(대기열 · PR · 리뷰) / 커밋 이력(코드 시티 · 그래프 · 규칙 지도 · 에이전트 규칙) */
 function sectionOf(path: string, base: string): Section {
   const rest = path.slice(base.length);
   if (/^\/(prs|reviews)(\/|$)/.test(rest)) return "pr";
-  if (/^\/(commits|insights|graph|agents)(\/|$)/.test(rest)) return "commit";
+  if (/^\/(commits|insights|graph|rules|agents)(\/|$)/.test(rest)) return "commit";
   return null;
 }
 
@@ -28,6 +28,7 @@ export function ProjectNav({ id }: { id: number }) {
     { href: `${base}/commits?tab=hotspots`, label: "핫스팟", active: /^\/(commits|insights)/.test(rest) && tab === "hotspots" },
     { href: `${base}/commits?tab=coupling`, label: "숨은 결합", active: /^\/(commits|insights)/.test(rest) && tab === "coupling" },
     { href: `${base}/graph`, label: "코드 그래프", active: rest.startsWith("/graph") },
+    { href: `${base}/rules`, label: "규칙 지도", active: rest.startsWith("/rules") },
     { href: `${base}/agents`, label: "에이전트 규칙", active: rest.startsWith("/agents") },
   ];
   const pr = /^\/prs\/(\d+)/.exec(rest)?.[1];

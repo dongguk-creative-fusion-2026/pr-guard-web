@@ -457,6 +457,39 @@ function orIfMissing<T, F>(promise: Promise<T>, fallback: F): Promise<T | F> {
   });
 }
 
+/** 규칙 지도의 규칙 하나 (백엔드 com.prguard.rulemap.Rule) */
+export type RuleKind = "THROWS" | "RETURNS_NULL" | "GUARD" | "AUTH" | "ORDERED" | "ATOMIC_UPDATE" | "FIELD" | "CONVENTION";
+
+export type MapRule = {
+  id: string;
+  kind: RuleKind;
+  origin: "CODE" | "CONVENTION";
+  /** 메서드 id · 타입 FQN · 타입FQN.필드 · 관례 키 */
+  subject: string;
+  statement: string;
+  detail: string | null;
+  file: string | null;
+  line: number;
+  /** 관례: 따르는 곳 / 해당하는 곳 */
+  support: number;
+  total: number;
+  members: string[];
+};
+
+/** 기본 브랜치 끝 커밋의 규칙 지도와, 지난 지도 대비 바뀐 규칙 */
+export type RuleMapView = {
+  repo: string;
+  branch: string;
+  commitSha: string;
+  /** 저장해 둔 지도를 꺼냈나 (false 면 이번에 만듦) */
+  cached: boolean;
+  version: number;
+  rules: MapRule[];
+  previousSha: string | null;
+  added: MapRule[];
+  removed: MapRule[];
+};
+
 export const api = {
   listProjects: () => call<Project[]>("/api/projects"),
   getProject: (id: number) => call<Project>(`/api/projects/${id}`),
@@ -495,6 +528,8 @@ export const api = {
       [],
     ),
   getAgentsMd: (id: number) => call<AgentsInfo>(`/api/projects/${id}/agents-md`),
+  /** 백엔드가 지원하지 않으면 null */
+  getRules: (id: number) => orIfMissing(call<RuleMapView>(`/api/projects/${id}/rules`), null),
   /** 백엔드가 지원하지 않으면 빈 목록 */
   getLessons: (id: number) => orIfMissing(call<Lesson[]>(`/api/projects/${id}/agents-md/lessons`), [] as Lesson[]),
   createAgentsPull: (id: number, content: string) =>
