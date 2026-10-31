@@ -11,6 +11,7 @@ export type InvariantCandidate = {
 };
 
 export type InvariantInterpretation = { engine: string; candidates: InvariantCandidate[] };
+export type InvariantSuggestions = { headSha: string; files: string[]; limited: boolean; interpretation: InvariantInterpretation };
 
 export type InvariantRun = {
   id: string;
@@ -18,6 +19,8 @@ export type InvariantRun = {
   headSha: string;
   baseSha: string;
   runUrl?: string | null;
+  createdAt?: string | null;
+  finishedAt?: string | null;
   result?: {
     status: string;
     error?: string;

@@ -39,7 +39,11 @@ export default async function PullPage({
     if (error instanceof ApiError && error.status === 404) return { rules: "" };
     throw error;
   });
-  const invariantSettings = settings && <InvariantSettings projectId={projectId} number={number} initialRules={settings.rules} projectRules={projectSettings.rules} />;
+  let latestRun = null;
+  let runLoadError = false;
+  try { latestRun = (await api.getLatestInvariantRun(projectId, number)).run; }
+  catch { runLoadError = true; }
+  const invariantSettings = settings && <InvariantSettings projectId={projectId} number={number} initialRules={settings.rules} projectRules={projectSettings.rules} initialRun={latestRun} currentHead={pull.headSha} runLoadError={runLoadError} />;
   const runs = reviews.filter((r) => r.prNumber === number);
   const review = runs.find((r) => r.id === chosen) ?? runs[0];
   if (!review) {

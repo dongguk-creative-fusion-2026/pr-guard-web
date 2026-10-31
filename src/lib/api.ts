@@ -1,5 +1,5 @@
 import "server-only";
-import type { InvariantCandidate, InvariantInterpretation, InvariantRun } from "./invariants";
+import type { InvariantCandidate, InvariantInterpretation, InvariantRun, InvariantSuggestions } from "./invariants";
 export type { InvariantCandidate, InvariantRun } from "./invariants";
 import type { GuardDogReport } from "./guarddog";
 
@@ -527,6 +527,10 @@ export const api = {
     call<InvariantRun>(`/api/projects/${id}/pulls/${number}/invariant-runs`, { method: "POST", body: JSON.stringify(candidate) }),
   getInvariantRun: (id: number, number: number, runId: string) =>
     call<InvariantRun>(`/api/projects/${id}/pulls/${number}/invariant-runs/${runId}`),
+  getLatestInvariantRun: (id: number, number: number) =>
+    call<{ run: InvariantRun | null }>(`/api/projects/${id}/pulls/${number}/invariant-runs/latest`),
+  suggestInvariantRules: (id: number, number: number) =>
+    call<InvariantSuggestions>(`/api/projects/${id}/pulls/${number}/invariant-suggestions`, { method: "POST" }),
   compileInvariantRules: (id: number, number: number, rules: string) =>
     call<InvariantInterpretation>(`/api/projects/${id}/pulls/${number}/invariant-settings/compile`, {
       method: "POST", body: JSON.stringify({ rules }),

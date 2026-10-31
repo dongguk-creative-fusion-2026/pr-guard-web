@@ -5,8 +5,8 @@ import { getInvariantRun, startInvariantRun } from "@/app/actions";
 import { isInvariantActive, type InvariantCandidate, type InvariantRun } from "@/lib/invariants";
 
 /** One current execution; never poll overlapping requests or continue after unmount. */
-export function useInvariantRun(projectId: number, number: number) {
-  const [run, setRun] = useState<InvariantRun | null>(null);
+export function useInvariantRun(projectId: number, number: number, initialRun: InvariantRun | null) {
+  const [run, setRun] = useState<InvariantRun | null>(initialRun);
   const [pollError, setPollError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export function useInvariantRun(projectId: number, number: number) {
       try {
         const response = await getInvariantRun(projectId, number, run.id);
         if (cancelled) return;
-        if (response.run) setRun(response.run);
+        if (response.run) setRun(previous => ({ ...response.run!, createdAt: previous?.createdAt, finishedAt: response.run!.finishedAt ?? previous?.finishedAt }));
         else setPollError(response.error ?? "실행 결과를 조회하지 못했습니다.");
       } catch {
         if (!cancelled) setPollError("실행 결과를 조회하지 못했습니다.");
