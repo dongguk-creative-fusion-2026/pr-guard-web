@@ -25,6 +25,11 @@ export async function compileInvariantRules(projectId: number, number: number, r
   }
 }
 
+export async function suggestInvariantRules(projectId: number, number: number) {
+  try { return { suggestions: await api.suggestInvariantRules(projectId, number) }; }
+  catch (e) { return { error: e instanceof ApiError ? e.message : "PR에서 규칙을 제안하지 못했습니다." }; }
+}
+
 export async function saveInvariantSettings(projectId: number, number: number, rules: string): Promise<FormState> {
   try {
     await api.saveInvariantSettings(projectId, number, rules);
