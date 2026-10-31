@@ -6,6 +6,16 @@ import { api, ApiError } from "@/lib/api";
 
 export type FormState = { error?: string; message?: string; reviewId?: number };
 
+export async function saveInvariantSettings(projectId: number, number: number, rules: string): Promise<FormState> {
+  try {
+    await api.saveInvariantSettings(projectId, number, rules);
+    revalidatePath(`/projects/${projectId}/prs/${number}`);
+    return { message: "규칙을 저장했습니다." };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "규칙을 저장하지 못했습니다." };
+  }
+}
+
 export async function registerProject(_: FormState, form: FormData): Promise<FormState> {
   const url = String(form.get("url") ?? "").trim();
   if (!url) return { error: "레포 주소를 입력하세요" };

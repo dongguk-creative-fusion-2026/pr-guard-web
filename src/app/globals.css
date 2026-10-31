@@ -7119,3 +7119,10 @@ a.cg-ref.pr:hover {
     grid-column: 2;
   }
 }
+.invariant-settings { max-width: 1200px; margin: 1rem auto; padding: 1rem; border: 1px solid #394355; border-radius: 12px; background: #171e2a; color: #e7edf5; }
+.invariant-settings h2 { margin: 0 0 .5rem; font-size: 1.05rem; }
+.invariant-settings p { color: #b8c4d4; }
+.invariant-settings label { display: block; margin-bottom: .4rem; }
+.invariant-settings textarea { display: block; width: 100%; box-sizing: border-box; padding: .65rem; margin-bottom: .6rem; color: inherit; background: #101722; border: 1px solid #58677e; border-radius: 6px; resize: vertical; }
+.invariant-settings button { padding: .5rem .8rem; cursor: pointer; }
+.invariant-settings button:disabled { cursor: wait; }

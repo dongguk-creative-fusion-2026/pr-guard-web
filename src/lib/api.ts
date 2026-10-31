@@ -464,6 +464,12 @@ export const api = {
     call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ url }) }),
   deleteProject: (id: number) => call<void>(`/api/projects/${id}`, { method: "DELETE" }),
   listPulls: (id: number) => call<PullRequest[]>(`/api/projects/${id}/pulls`),
+  getInvariantSettings: (id: number, number: number) =>
+    call<{ rules: string }>(`/api/projects/${id}/pulls/${number}/invariant-settings`),
+  saveInvariantSettings: (id: number, number: number, rules: string) =>
+    call<{ rules: string }>(`/api/projects/${id}/pulls/${number}/invariant-settings`, {
+      method: "PUT", body: JSON.stringify({ rules }),
+    }),
   listReviews: (id: number, limit = 20) => call<Review[]>(`/api/projects/${id}/reviews?limit=${limit}`),
   pollNow: (id: number) => call<PollResult>(`/api/projects/${id}/poll`, { method: "POST" }),
   getReview: (reviewId: number) => call<ReviewDetail>(`/api/reviews/${reviewId}`),
