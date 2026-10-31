@@ -6,6 +6,7 @@ import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
+import { countByPurpose, semgrepInfo } from "@/lib/semgrep";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import Link from "next/link";
 import { durationMs, STAGE_META, type StageData, type StageId, type StageState } from "./stages";
@@ -19,7 +20,14 @@ type GroundView = {
   layers: { layer: GroundLayerId; mark: GroundMark; note: string }[];
 };
 
-type FindingView = { severity: string; ruleId: string; title: string; file: string | null; line: number | null };
+type FindingView = {
+  severity: string;
+  ruleId: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  evidence?: string | null;
+};
 
 function fileName(path: string | null | undefined): string {
   return path ? path.slice(path.lastIndexOf("/") + 1) : "-";
@@ -165,24 +173,57 @@ export function StageDetail({
               {d.dropped > 0 && ` · 변경 파일 밖을 가리킨 지적 ${d.dropped}건 제외`}
             </p>
           )}
+          {(() => {
+            const semgrep = ((d.findings ?? []) as FindingView[]).map(semgrepInfo).filter((s) => s !== null);
+            return (
+              semgrep.length > 0 && (
+                <p className="muted semgrep-summary">
+                  Semgrep{" "}
+                  {countByPurpose(semgrep).map(([purpose, n]) => (
+                    <span key={purpose} className="semgrep-chip" data-purpose={purpose}>
+                      {purpose} {n}
+                    </span>
+                  ))}
+                </p>
+              )
+            );
+          })()}
           {(d.findings ?? []).length === 0 ? (
             <div className="empty">지적 사항 없음</div>
           ) : (
             <ul className="finding-list">
-              {(d.findings as FindingView[]).map((f, i) => (
-                <motion.li
-                  key={`${f.ruleId}-${i}`}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <span className={`sev ${f.severity}`}>{f.severity}</span> {f.title}{" "}
-                  <span className="muted">
-                    {fileName(f.file)}
-                    {f.line != null && `:${f.line}`}
-                  </span>
-                </motion.li>
-              ))}
+              {(d.findings as FindingView[]).map((f, i) => {
+                const sg = semgrepInfo(f);
+                return (
+                  <motion.li
+                    key={`${f.ruleId}-${i}`}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <span className={`sev ${f.severity}`}>{f.severity}</span>{" "}
+                    {sg ? (
+                      <>
+                        <span className="semgrep-chip" data-purpose={sg.purpose}>
+                          {sg.purpose}
+                        </span>{" "}
+                        {sg.rule}
+                      </>
+                    ) : (
+                      f.title
+                    )}{" "}
+                    <span className="muted">
+                      {fileName(f.file)}
+                      {f.line != null && `:${f.line}`}
+                    </span>
+                    {sg?.fix && (
+                      <div className="semgrep-fix">
+                        수정 제안 <code>{sg.fix}</code>
+                      </div>
+                    )}
+                  </motion.li>
+                );
+              })}
             </ul>
           )}
         </>
