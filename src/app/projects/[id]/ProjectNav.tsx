@@ -42,6 +42,7 @@ export function ProjectNav({ id }: { id: number }) {
           커밋 이력
         </Link>
       </div>
+      <Link href={`${base}/invariants`} className={rest === "/invariants" ? "active" : ""}>정합성 규칙</Link>
       {section === "commit" && (
         <div className="pnav-tabs">
           {commitTabs.map((t) => (

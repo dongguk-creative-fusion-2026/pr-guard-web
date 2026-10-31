@@ -4,6 +4,29 @@ PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사�
 
 - 백엔드: [pr-guard-api](https://github.com/dongguk-creative-fusion-2026/pr-guard-api)
 
+## 데이터 정합성 규칙과 Hypothesis 실행
+
+프로젝트 상단의 **정합성 규칙** 화면(`/projects/{id}/invariants`)에서 기본 규칙을 저장한다. PR 상세 화면에서는 이를 불러오거나 별도의 초안을 작성하고, 규칙 후보 생성 → 조건 확인 → 지원 규칙 수동 실행 → 결과 확인 순서로 사용한다. 프로젝트 기본 규칙을 바꿔도 저장된 PR 초안을 자동으로 덮어쓰지 않는다.
+
+실행은 GitHub Actions에서 수행하며 브라우저나 Next.js 서버가 PR 코드를 실행하지 않는다. 사용자 PC에 Docker·Kubernetes·Python을 설치할 필요가 없다. API가 반환하는 `QUEUED`, `RUNNING`, `DONE`, `FAILED` 상태를 조회하고 Actions 링크와 반례를 표시한다. 조회 실패는 별도로 표시하며 재시도할 수 있다.
+
+현재 실제 실행은 `pr-guard-sandbox`의 게시글 작성자 ID 보존 규칙만 지원한다. LLM이 해석한 다른 규칙은 검토 후보이며 실행 버튼을 제공하지 않는다. 지원 규칙도 Spring 서비스와 H2 테스트 DB에서 검증하므로 전체 업무 규칙·실제 PostgreSQL·HTTP 인증의 안전성 보장은 아니다. 반례 미발견도 검증 예산 안에서 발견하지 못했다는 의미다. 결과는 머지 판정에 반영하지 않는다.
+
+| 코드 | 역할 |
+|---|---|
+| `src/lib/invariants.ts` | 공유 타입, 활성 실행 판단, 결과 메시지 |
+| `src/components/invariants/useInvariantRun.ts` | 실행 요청과 중복 없는 폴링, 오류·재시도·언마운트 정리 |
+| `src/components/invariants/InvariantRunResult.tsx` | 상태·커밋·Actions 링크·반례 표시 |
+| `src/app/projects/[id]/prs/[number]/InvariantSettings.tsx` | PR 규칙 편집과 후보 확인 |
+| `src/app/projects/[id]/invariants/` | 프로젝트 기본 규칙 편집 |
+| `src/app/actions.ts` / `src/lib/api.ts` | 서버 전용 API 호출과 저장 후 갱신 |
+
+### 배포 순서와 확인
+
+백엔드의 워크플로·DB 마이그레이션·Actions 토큰 권한을 먼저 준비하고 `INVARIANT_EXEC_ENABLED=true`로 활성화한 뒤 웹을 배포한다. Next.js의 `API_BASE_URL`과 필요시 `API_TOKEN`을 백엔드와 맞춘다. OpenAI 키와 Actions 실행용 GitHub 토큰은 백엔드에만 설정한다. [백엔드 상세 설정](https://github.com/dongguk-creative-fusion-2026/pr-guard-api/blob/main/invariant-poc/README.md)
+
+웹 프로덕션 빌드와 타입 검사를 확인했다. 실제 배포 환경에서 버튼부터 Actions 완료까지의 브라우저 종단 간 확인은 별도로 필요하다. 기존 백엔드에 PR 설정 API가 없으면 PR 입력 영역은 표시하지 않으며, 프로젝트 기본 규칙 화면은 해당 API를 제공하는 백엔드가 필요하다.
+
 ## 화면
 
 | 화면 | 주소 | 내용 |

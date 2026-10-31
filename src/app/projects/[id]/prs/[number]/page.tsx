@@ -35,7 +35,11 @@ export default async function PullPage({
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   });
-  const invariantSettings = settings && <InvariantSettings projectId={projectId} number={number} initialRules={settings.rules} />;
+  const projectSettings = await api.getProjectInvariantSettings(projectId).catch((error) => {
+    if (error instanceof ApiError && error.status === 404) return { rules: "" };
+    throw error;
+  });
+  const invariantSettings = settings && <InvariantSettings projectId={projectId} number={number} initialRules={settings.rules} projectRules={projectSettings.rules} />;
   const runs = reviews.filter((r) => r.prNumber === number);
   const review = runs.find((r) => r.id === chosen) ?? runs[0];
   if (!review) {
