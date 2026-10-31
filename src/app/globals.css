@@ -558,6 +558,51 @@ button.small {
   padding-left: 18px;
 }
 
+/* Semgrep 용도 (보안 · 버그 패턴 · 모범 사례 · 팀 규칙 · 마이그레이션) */
+.semgrep-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.semgrep-chip {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.semgrep-chip[data-purpose="보안"],
+.semgrep-chip[data-purpose="버그 패턴"] {
+  color: var(--warn);
+  border-color: currentColor;
+}
+
+.semgrep-chip[data-purpose="마이그레이션"],
+.semgrep-chip[data-purpose="팀 규칙"] {
+  color: var(--accent);
+  border-color: currentColor;
+}
+
+.semgrep-fix {
+  margin: 2px 0 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.semgrep-fix code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--fg);
+  word-break: break-all;
+}
+
 .impact-graph {
   border: 1px solid var(--border);
   border-radius: 8px;
