@@ -106,7 +106,7 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
   // 변이 테스트: head 빌드 · 테스트 안에서 이어서 돈다
   EXEC_MUTATION: { x: 4.5 * COL, y: 7.5 * ROW },
-  // SonarCloud: head 러너가 테스트 뒤에 스캔하고, 결과는 근거 확인으로 바로 간다
+  // SonarCloud: head 러너가 테스트 뒤에(없으면 GitHub Actions 가) 스캔하고, 결과는 근거 확인으로 바로 간다
   EXEC_SONAR: { x: 5.5 * COL, y: 7.5 * ROW },
   // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
   EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },

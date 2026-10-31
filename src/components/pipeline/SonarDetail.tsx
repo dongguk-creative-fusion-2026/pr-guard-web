@@ -1,4 +1,4 @@
-import { metricLabel, SONAR_METRICS, type SonarData, type SonarStage } from "@/lib/sonar";
+import { metricLabel, SONAR_METRICS, viaText, type SonarData, type SonarStage } from "@/lib/sonar";
 import styles from "./Sonar.module.css";
 
 /** 지적이 SonarCloud 에서 왔음을 표시하는 배지 */
@@ -64,7 +64,10 @@ export function SonarCard({ stage }: { stage: SonarStage | null }) {
       <h3>
         SonarCloud <SonarBadge />
       </h3>
-      <p className={styles.why}>head 러너가 테스트 뒤에 스캔해 올린 PR 분석. 커버리지 · 중복률 · 복잡도 · 이슈를 이번 PR 이 추가한 줄 기준으로 봅니다.</p>
+      <p className={styles.why}>
+        {done ? viaText(stage.data!.via) + "." : "실행 검증 러너가 있으면 러너가, 없으면 GitHub Actions 가 스캔합니다."} 중복률 · 복잡도 · 이슈를 이번 PR
+        이 추가한 줄 기준으로 봅니다.
+      </p>
       {done ? (
         <>
           <SonarSummary data={stage.data!} compact />
@@ -89,7 +92,7 @@ export function SonarStageDetail({ data }: { data: SonarData }) {
   return (
     <>
       <p className="muted">
-        head 러너가 빌드 · 테스트 뒤 JaCoCo 커버리지와 함께 sonar-scanner 로 PR 분석을 올리고, SonarCloud 처리가 끝나면 이슈 · 지표 · Quality Gate 를 가져옵니다.
+        {viaText(data.via)}. SonarCloud 처리가 끝나면 이슈 · 지표 · Quality Gate 를 가져옵니다.
         이슈는 이번 PR 이 추가한 줄에 걸린 것만 지적으로 남깁니다.
       </p>
       <SonarSummary data={data} />
