@@ -129,8 +129,11 @@ function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: numbe
     return () => clearInterval(timer);
   }, [running]);
 
-  // 선택이 없으면 마지막으로 움직인 단계를 따라간다
-  const lastStage = [...visible].reverse().find((e) => e.stage !== "REVIEW")?.stage as
+  // 선택이 없으면 마지막으로 움직인 단계를 따라간다.
+  // 그래프에 없는 단계(예: 노드를 뺀 CHECK_A)는 건너뛴다. API 는 여전히 보내므로 그대로 고르면 states 에 없어 터진다
+  const lastStage = [...visible]
+    .reverse()
+    .find((e) => GRAPH_STAGES.includes(e.stage as Exclude<StageId, "REVIEW">))?.stage as
     | Exclude<StageId, "REVIEW">
     | undefined;
   const focus = selected ?? lastStage ?? null;
