@@ -5,10 +5,12 @@ import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
+import { SonarStageDetail } from "./SonarDetail";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
+import { countByPurpose, semgrepInfo } from "@/lib/semgrep";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import Link from "next/link";
-import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
+import { durationMs, STAGE_META, type StageData, type StageId, type StageState } from "./stages";
 
 type GroundView = {
   severity: string;
@@ -19,7 +21,14 @@ type GroundView = {
   layers: { layer: GroundLayerId; mark: GroundMark; note: string }[];
 };
 
-type FindingView = { severity: string; ruleId: string; title: string; file: string | null; line: number | null };
+type FindingView = {
+  severity: string;
+  ruleId: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  evidence?: string | null;
+};
 
 type ConflictMethodView = {
   id: string;
@@ -142,6 +151,8 @@ export function StageDetail({
           {d.ast && <AstDiffView methods={d.ast} />}
         </>
       )}
+
+      {d && stage === "IMPACT" && <GraphImpactDetail d={d} />}
 
       {d && stage === "HISTORY" && (
         <>
@@ -274,24 +285,57 @@ export function StageDetail({
               {d.dropped > 0 && ` · 변경 파일 밖을 가리킨 지적 ${d.dropped}건 제외`}
             </p>
           )}
+          {(() => {
+            const semgrep = ((d.findings ?? []) as FindingView[]).map(semgrepInfo).filter((s) => s !== null);
+            return (
+              semgrep.length > 0 && (
+                <p className="muted semgrep-summary">
+                  Semgrep{" "}
+                  {countByPurpose(semgrep).map(([purpose, n]) => (
+                    <span key={purpose} className="semgrep-chip" data-purpose={purpose}>
+                      {purpose} {n}
+                    </span>
+                  ))}
+                </p>
+              )
+            );
+          })()}
           {(d.findings ?? []).length === 0 ? (
             <div className="empty">지적 사항 없음</div>
           ) : (
             <ul className="finding-list">
-              {(d.findings as FindingView[]).map((f, i) => (
-                <motion.li
-                  key={`${f.ruleId}-${i}`}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <span className={`sev ${f.severity}`}>{f.severity}</span> {f.title}{" "}
-                  <span className="muted">
-                    {fileName(f.file)}
-                    {f.line != null && `:${f.line}`}
-                  </span>
-                </motion.li>
-              ))}
+              {(d.findings as FindingView[]).map((f, i) => {
+                const sg = semgrepInfo(f);
+                return (
+                  <motion.li
+                    key={`${f.ruleId}-${i}`}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <span className={`sev ${f.severity}`}>{f.severity}</span>{" "}
+                    {sg ? (
+                      <>
+                        <span className="semgrep-chip" data-purpose={sg.purpose}>
+                          {sg.purpose}
+                        </span>{" "}
+                        {sg.rule}
+                      </>
+                    ) : (
+                      f.title
+                    )}{" "}
+                    <span className="muted">
+                      {fileName(f.file)}
+                      {f.line != null && `:${f.line}`}
+                    </span>
+                    {sg?.fix && (
+                      <div className="semgrep-fix">
+                        수정 제안 <code>{sg.fix}</code>
+                      </div>
+                    )}
+                  </motion.li>
+                );
+              })}
             </ul>
           )}
         </>
@@ -360,6 +404,8 @@ export function StageDetail({
           )}
         </>
       )}
+
+      {d && stage === "EXEC_SONAR" && <SonarStageDetail data={d} />}
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 
@@ -472,5 +518,69 @@ export function StageDetail({
         </p>
       )}
     </motion.div>
+  );
+}
+
+type ImpactFn = { file: string; name: string; line: number; depth: number; via: string | null; confirmed: boolean };
+
+/** GitNexus 호출 그래프로 따라간 변경 영향: 바뀐 함수 → 부르는 함수를 단계별로 */
+function GraphImpactDetail({ d }: { d: StageData }) {
+  const changed = (d.changed ?? []) as ImpactFn[];
+  const impacted = (d.impacted ?? []) as ImpactFn[];
+  const depths = [...new Set(impacted.map((f) => f.depth))].sort((a, b) => a - b);
+  return (
+    <>
+      <p className="muted">
+        기본 브랜치 <code>{String(d.commitSha ?? "").slice(0, 7)}</code> 의 GitNexus 호출 그래프에서 바뀐 함수를 부르는
+        함수를 따라갔습니다. 언어를 가리지 않고, &quot;인덱스로도 확인&quot;은 Java 인덱스가 같은 호출을 찾은 것입니다.
+        {d.baseMatches === false && " 그래프 커밋이 이 PR 의 base 와 달라 줄 위치가 조금 어긋날 수 있습니다."}
+        {d.complete === false && " 그래프가 레포 일부만 담고 있어 빠진 호출이 있을 수 있습니다."}
+      </p>
+      <div className="stats">
+        {[
+          ["바뀐 함수", changed.length],
+          ["영향 함수", impacted.length],
+          ["고치지 않은 파일", (d.impactedFiles ?? []).length],
+          ["인덱스로도 확인", d.confirmed ?? 0],
+        ].map(([k, v]) => (
+          <div key={k} className="stat">
+            <div className="stat-value">{v}</div>
+            <div className="muted">{k}</div>
+          </div>
+        ))}
+      </div>
+      {changed.length > 0 && (
+        <>
+          <h4>바뀐 함수</h4>
+          <ul className="impact-fns">
+            {changed.map((f) => (
+              <li key={`${f.file}#${f.name}:${f.line}`}>
+                <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {depths.map((depth) => (
+        <div key={depth}>
+          <h4>{depth}단계 — 부르는 함수</h4>
+          <ul className="impact-fns">
+            {impacted
+              .filter((f) => f.depth === depth)
+              .map((f) => (
+                <li key={`${f.file}#${f.name}:${f.line}`}>
+                  <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+                  {f.via && <span className="muted"> → {f.via.split("#").pop()}</span>}
+                  {f.confirmed && <span className="impact-confirmed">인덱스로도 확인</span>}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
+      {impacted.length === 0 && <div className="empty">이 변경을 부르는 함수가 그래프에 없음</div>}
+      {(d.unmapped ?? []).length > 0 && (
+        <p className="muted">그래프에 없는 바뀐 파일(새 파일 · 함수 밖 변경): {(d.unmapped as string[]).map(fileName).join(", ")}</p>
+      )}
+    </>
   );
 }

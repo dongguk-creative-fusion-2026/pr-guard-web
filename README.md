@@ -8,7 +8,6 @@ PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사�
 
 | 화면 | 주소 | 내용 |
 |---|---|---|
-| 입구 인증 | `/login` | `ACCESS_TOKEN` 이 있으면 모든 화면이 이 토큰 입력 뒤에 있다. 맞으면 30일 유지, 상단 바에 로그아웃 |
 | 홈 | `/` | 레포 등록, 프로젝트 목록(구성 · 열린 PR · 볼 PR · 자동 통과 · 판정 분포 · 마지막 확인) |
 | 입구 | `/projects/{id}` | 화면 전체에 코드 시티를 깔고, 사람이 볼 PR(머지 막힘 · 확인 필요)이 바꾼 건물을 판정 색으로 세운다. 오른쪽에 PR 이력 · 커밋 이력 패널. 진행 중인 리뷰는 **리뷰 장면**으로 실시간 재생, 아니면 보안 지적이 있는 최근 리뷰를 다시 보기. "실행 검증 미리보기"(예시 데이터) |
 | PR 이력 · 대기열 | `/projects/{id}/prs` | 병목 숫자, 차단 · 확인 필요 · 자동 통과 칸 |
@@ -91,7 +90,6 @@ src/
 | 변수 | 설명 |
 |---|---|
 | `API_BASE_URL` | pr-guard-api 주소 (기본 `http://localhost:8080`). 서버에서 실행할 때 읽는다 |
-| `ACCESS_TOKEN` | 있으면 화면 전체가 토큰 입력(`/login`) 뒤로 간다. 팀원에게 나눠 주는 값. 바꾸면 모두 다시 입력해야 한다 |
 | `API_TOKEN` | pr-guard-api 의 `API_TOKEN` 과 같은 값. 서버에서 백엔드를 부를 때 `X-Api-Token` 으로 보낸다 (브라우저로 나가지 않음) |
 
 ## 로컬 실행
@@ -103,4 +101,4 @@ API_BASE_URL=http://localhost:8080 npm run dev
 
 ## Vercel 배포
 
-Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `ACCESS_TOKEN`, `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.
+Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Logo } from "@/components/Logo";
-import { LogoutButton } from "@/components/LogoutButton";
 import { api, ApiError } from "@/lib/api";
 import { PollButton } from "./PollButton";
 import { ProjectNav } from "./ProjectNav";
@@ -46,7 +45,6 @@ export default async function ProjectLayout({
           <Link href={`/projects/${id}/onboarding?step=4`} className="pbar-link">
             설정
           </Link>
-          <LogoutButton />
         </div>
       </header>
       {children}

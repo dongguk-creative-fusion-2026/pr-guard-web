@@ -71,6 +71,29 @@ export type PullRequest = {
   latestReviewStatus: ReviewStatus | null;
 };
 
+/** 변경 영향의 함수 하나. depth 0 = 바뀐 함수, 1 = 그 함수를 부르는 함수 … */
+export type GraphImpactFn = {
+  file: string;
+  name: string;
+  line: number;
+  depth: number;
+  /** 바로 앞 단계 함수 ("파일#이름") */
+  via: string | null;
+  /** Java 인덱스도 같은 호출을 찾았나 */
+  confirmed: boolean;
+};
+
+export type GraphImpact = {
+  commitSha: string | null;
+  baseMatches: boolean;
+  complete: boolean;
+  changed: GraphImpactFn[];
+  impacted: GraphImpactFn[];
+  impactedFiles: string[];
+  unmapped: string[];
+  truncated: boolean;
+};
+
 export type ReviewStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "SUPERSEDED";
 export type Verdict = "MERGEABLE" | "NEEDS_CHANGES" | "NOT_RECOMMENDED";
 export type Severity = "BLOCKER" | "MAJOR" | "MINOR" | "INFO";
@@ -184,6 +207,8 @@ export type AnalysisContext = {
   blame: { file: string; line: number; sha: string; author: string; time: number; summary: string }[];
   notes: string[];
   elapsedMs: number;
+  /** GitNexus 호출 그래프로 따라간 변경 영향 (예전 리뷰 · 그래프 없는 프로젝트에는 없다) */
+  graphImpact?: GraphImpact | null;
 };
 
 export type ReviewDetail = {

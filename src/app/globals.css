@@ -519,6 +519,23 @@ button.small {
   gap: 8px;
 }
 
+.impact-fns {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 12px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.impact-confirmed {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  background: var(--surface);
+}
+
 .cochange-label {
   font-size: 0.85rem;
   margin-bottom: 2px;
@@ -539,6 +556,51 @@ button.small {
 
 .finding-list {
   padding-left: 18px;
+}
+
+/* Semgrep 용도 (보안 · 버그 패턴 · 모범 사례 · 팀 규칙 · 마이그레이션) */
+.semgrep-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.semgrep-chip {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.semgrep-chip[data-purpose="보안"],
+.semgrep-chip[data-purpose="버그 패턴"] {
+  color: var(--warn);
+  border-color: currentColor;
+}
+
+.semgrep-chip[data-purpose="마이그레이션"],
+.semgrep-chip[data-purpose="팀 규칙"] {
+  color: var(--accent);
+  border-color: currentColor;
+}
+
+.semgrep-fix {
+  margin: 2px 0 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.semgrep-fix code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--fg);
+  word-break: break-all;
 }
 
 .impact-graph {
@@ -5929,93 +5991,6 @@ a.cg-ref.pr:hover {
   .status-screen .spinner {
     animation: none;
   }
-}
-
-/* 입구의 토큰 입력 (login) */
-.login {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 16px;
-}
-
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  padding: 32px 28px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.login-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.login-card h1 {
-  margin: 0 0 6px;
-  font-size: 1.375rem;
-}
-
-.login-help {
-  margin: 0 0 20px;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.login-form label {
-  color: var(--fg-2);
-  font-size: 0.8125rem;
-}
-
-.login-form input {
-  padding: 10px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.875rem;
-}
-
-.login-form input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.login-form input[aria-invalid="true"] {
-  border-color: var(--danger);
-}
-
-.login-form .error {
-  margin: 0;
-}
-
-.login-form button {
-  margin-top: 12px;
-  padding: 10px 14px;
-}
-
-.pbar-logout {
-  display: contents;
-}
-
-.pbar-logout button {
-  padding: 0;
-  border: 0;
-  background: none;
 }
 
 /* 영향 테스트 선택 (reviews/[reviewId]/tests · PR 판단 화면 카드) */

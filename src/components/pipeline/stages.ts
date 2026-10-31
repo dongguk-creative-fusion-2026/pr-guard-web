@@ -6,9 +6,9 @@ export type StageId =
   | "INDEX_BASE"
   | "INDEX_HEAD"
   | "METHOD_DIFF"
+  | "IMPACT"
   | "HISTORY"
   | "RULE_MAP"
-  | "CHECK_A"
   | "CHECK_B"
   | "CHECK_C"
   | "CHECK_D"
@@ -21,6 +21,7 @@ export type StageId =
   | "EXEC_TEST_HEAD"
   | "EXEC_MUTATION"
   | "EXEC_DIFF"
+  | "EXEC_SONAR"
   | "EXEC_EVIDENCE"
   | "EXEC_SELECT"
   | "GROUND"
@@ -58,12 +59,12 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   INDEX_BASE: { label: "base 인덱스", hint: "타입 · 메서드 · 호출" },
   INDEX_HEAD: { label: "head 인덱스", hint: "타입 · 메서드 · 호출" },
   METHOD_DIFF: { label: "메서드 비교", hint: "바뀐 메서드 · 호출부" },
+  IMPACT: { label: "변경 영향", hint: "GitNexus 호출 그래프 · 여러 단계" },
   HISTORY: { label: "git 이력", hint: "동시 변경 · blame" },
   RULE_MAP: { label: "규칙 지도", hint: "기존 코드가 지키는 규칙" },
-  CHECK_A: { label: "A · 의도 대비", hint: "PR 설명 ↔ 변경" },
   CHECK_B: { label: "B · 변경 영향", hint: "호출부 · 참조" },
-  CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿" },
-  CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락" },
+  CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿 · Semgrep 보안" },
+  CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락 · Semgrep 버그 · 규칙 · 마이그레이션" },
   LLM: { label: "LLM 리뷰", hint: "근거 + diff" },
   LLM_CONFLICT: { label: "기존 코드 충돌", hint: "기대던 기존 코드 ↔ 변경" },
   EXEC_PREPARE: { label: "E · 실행 준비", hint: "러너 이미지 · Job 생성" },
@@ -73,6 +74,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   EXEC_TEST_HEAD: { label: "head 빌드 · 테스트", hint: "clone · 빌드 · 테스트" },
   EXEC_MUTATION: { label: "변이 테스트", hint: "심은 버그를 테스트가 잡나" },
   EXEC_DIFF: { label: "차등 비교", hint: "base 통과 → head 실패" },
+  EXEC_SONAR: { label: "SonarCloud", hint: "커버리지 · 중복 · Quality Gate" },
   EXEC_EVIDENCE: { label: "증거 테스트", hint: "바뀐 동작을 테스트로 고정" },
   EXEC_SELECT: { label: "테스트 선택", hint: "영향 있는 테스트만 실행" },
   GROUND: { label: "근거 확인", hint: "인덱스 · 이력 · 실행 · AI" },
@@ -92,10 +94,11 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   INDEX_BASE: { x: 2 * COL, y: 1.4 * ROW },
   INDEX_HEAD: { x: 2 * COL, y: 2.6 * ROW },
   METHOD_DIFF: { x: 3 * COL, y: 2 * ROW },
+  // 변경 영향: 미리 만든 GitNexus 그래프로 바뀐 함수를 부르는 쪽을 따라가 검사 · LLM 에 넘긴다
+  IMPACT: { x: 4 * COL, y: 0.8 * ROW },
   HISTORY: { x: 4 * COL, y: 2 * ROW },
-  // 규칙 지도: 이력 뒤에 만들어 관례 · 영향 검사와 기존 코드 충돌이 쓴다
-  RULE_MAP: { x: 4 * COL, y: 0.8 * ROW },
-  CHECK_A: { x: 5 * COL, y: 0 },
+  // 규칙 지도: 이력 뒤에 만들어 관례 · 영향 검사와 기존 코드 충돌이 쓴다 (변경 영향 노드 위)
+  RULE_MAP: { x: 4 * COL, y: -0.4 * ROW },
   CHECK_B: { x: 5 * COL, y: ROW },
   CHECK_C: { x: 5 * COL, y: 2 * ROW },
   CHECK_D: { x: 5 * COL, y: 3 * ROW },
@@ -110,6 +113,8 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   EXEC_DIFF: { x: 5 * COL, y: 5.9 * ROW },
   // 변이 테스트: head 빌드 · 테스트 안에서 이어서 돈다
   EXEC_MUTATION: { x: 4.5 * COL, y: 7.5 * ROW },
+  // SonarCloud: head 러너가 테스트 뒤에(없으면 GitHub Actions 가) 스캔하고, 결과는 근거 확인으로 바로 간다
+  EXEC_SONAR: { x: 5.5 * COL, y: 7.5 * ROW },
   // 증거 테스트: 메서드 비교 결과로 만들어 실행 레인의 빌드 · 테스트에 넣는다 (레인 밖, 두 흐름 사이)
   EXEC_EVIDENCE: { x: 3.5 * COL, y: 3.65 * ROW },
   // 테스트 선택: 바뀐 메서드와 기준 실행 기록으로 돌릴 테스트를 골라 빌드 · 테스트에 넘긴다
@@ -130,9 +135,9 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   INDEX_BASE: { x: -VCOL / 2, y: 2 * VROW },
   INDEX_HEAD: { x: VCOL / 2, y: 2 * VROW },
   METHOD_DIFF: { x: 0, y: 3 * VROW },
+  IMPACT: { x: -VCOL, y: 4.5 * VROW },
   HISTORY: { x: 0, y: 4 * VROW },
   RULE_MAP: { x: -2 * VCOL, y: 4 * VROW },
-  CHECK_A: { x: -VCOL, y: 5 * VROW },
   CHECK_B: { x: 0, y: 5 * VROW },
   CHECK_C: { x: VCOL, y: 5 * VROW },
   CHECK_D: { x: -VCOL / 2, y: 6 * VROW },
@@ -146,6 +151,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   EXEC_TEST_HEAD: { x: 2.6 * VCOL, y: 4 * VROW },
   EXEC_DIFF: { x: 2.1 * VCOL, y: 5 * VROW },
   EXEC_MUTATION: { x: 3.1 * VCOL, y: 4.5 * VROW },
+  EXEC_SONAR: { x: 3.1 * VCOL, y: 5.5 * VROW },
   EXEC_EVIDENCE: { x: -VCOL, y: 3.5 * VROW },
   EXEC_SELECT: { x: 2.1 * VCOL, y: 0.88 * VROW },
   GROUND: { x: 0, y: 7 * VROW },
@@ -160,7 +166,9 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["INDEX_BASE", "METHOD_DIFF"],
   ["INDEX_HEAD", "METHOD_DIFF"],
   ["METHOD_DIFF", "HISTORY"],
-  ["HISTORY", "CHECK_A"],
+  ["METHOD_DIFF", "IMPACT"],
+  ["IMPACT", "CHECK_B"],
+  ["IMPACT", "LLM"],
   ["HISTORY", "CHECK_B"],
   ["HISTORY", "CHECK_C"],
   ["HISTORY", "CHECK_D"],
@@ -170,7 +178,6 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["RULE_MAP", "CHECK_B"],
   ["RULE_MAP", "CHECK_D"],
   ["RULE_MAP", "LLM_CONFLICT"],
-  ["CHECK_A", "GROUND"],
   ["CHECK_B", "GROUND"],
   ["CHECK_C", "GROUND"],
   ["CHECK_D", "GROUND"],
@@ -187,6 +194,8 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["EXEC_TEST_HEAD", "EXEC_MUTATION"],
   ["EXEC_MUTATION", "EXEC_DIFF"],
   ["EXEC_DIFF", "GROUND"],
+  ["EXEC_TEST_HEAD", "EXEC_SONAR"],
+  ["EXEC_SONAR", "GROUND"],
   ["METHOD_DIFF", "EXEC_EVIDENCE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_BASE"],
   ["EXEC_EVIDENCE", "EXEC_TEST_HEAD"],
@@ -253,7 +262,6 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
         ...(data.baseCached ? ["저장분"] : []),
       ];
     }
-    case "CHECK_A":
     case "CHECK_B":
     case "CHECK_C":
     case "CHECK_D":
@@ -285,6 +293,12 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
       ...((data.flaky?.head?.length ?? 0) > 0 ? [`flaky ${data.flaky.head.length}`] : []),
       ];
     }
+    case "EXEC_SONAR":
+      return [
+        `Gate ${data.gate ?? "-"}`,
+        `이슈 ${data.findings?.length ?? 0}`,
+        ...(data.measures?.new_coverage != null ? [`커버리지 ${data.measures.new_coverage}%`] : []),
+      ];
     case "EXEC_EVIDENCE":
       return [`테스트 ${data.tests?.length ?? 0}`, ...(data.generator ? [String(data.generator)] : [])];
     case "EXEC_SELECT":
@@ -307,4 +321,4 @@ export function durationMs(s: StageState): number | null {
 }
 
 /** 실행 검증 레인 단계 (배경 묶음 상자를 그릴 때 쓴다) */
-export const EXEC_STAGES = ["EXEC_PREPARE", "EXEC_POD_BASE", "EXEC_POD_HEAD", "EXEC_TEST_BASE", "EXEC_TEST_HEAD", "EXEC_MUTATION", "EXEC_DIFF"] as const;
+export const EXEC_STAGES = ["EXEC_PREPARE", "EXEC_POD_BASE", "EXEC_POD_HEAD", "EXEC_TEST_BASE", "EXEC_TEST_HEAD", "EXEC_MUTATION", "EXEC_DIFF", "EXEC_SONAR"] as const;
