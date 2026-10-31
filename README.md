@@ -99,6 +99,32 @@ npm install
 API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
+## GuardDog 검사 결과
+
+PR 상세 화면은 `GET /api/reviews/{id}`의 `context.guarddog`를 표시한다. 기존 기록에 필드가 없으면
+완료된 CHECK_C/VERDICT 이벤트에서 찾고, 둘 다 없으면 `검사 기록 없음`으로 표시한다.
+검사 완료·일부 미완료·미완료·꺼짐·검사 대상 없음을 구분하며, 패키지를 펼치면 선언 파일,
+위험도·규칙·설명과 실패·생략 원인을 볼 수 있다. 집계는 패키지 이름·버전 단위다.
+
+지원 범위는 이번 PR에 추가·변경된 npm/PyPI 직접 의존성이다. 위험 신호가 0건이어도 검사가
+미완료이면 재검사가 필요하다고 안내한다. 열린 PR의 `전체 다시 검사`는 기존 다시 리뷰 API로
+새 리뷰를 요청한다. 패키지 하나만 검사하는 기능은 아니다. 실시간/다시보기의 보안·판정 단계에도
+동일한 결과를 표시하며, 기존 Sonar/Semgrep 결과는 함께 유지한다.
+
+브랜치는 로컬 실행에 제약이 없다. `feat/guarddog-ui`에서 API를 실행하고 `API_BASE_URL`을
+그 주소로 지정하면 배포·Push 없이 브라우저에서 테스트할 수 있다. PowerShell 예시:
+
+```powershell
+npm ci
+$env:API_BASE_URL = 'http://localhost:8080'
+npm run dev -- --hostname 127.0.0.1
+```
+
+`http://localhost:3000`에서 실제 프로젝트의 PR을 열어 확인한다. API의 GuardDog 설정을 켜고 새
+리뷰를 완료해야 새 검사 기록이 생긴다. 기존 리뷰를 열기만 해서는 검사를 실행하지 않는다.
+API_TOKEN이 필요한 서버는 같은 값을 웹 서버 환경변수에 설정한다. `NEXT_PUBLIC_` 변수에 넣지 않는다.
+기본 회귀 검증은 `npm test`, 타입·배포 빌드 검증은 `npm run build`로 실행한다.
+
 ## Vercel 배포
 
 Vercel 에서 이 레포를 Import 하고 Environment Variables 에 `API_BASE_URL`(Railway 도메인), `API_TOKEN` 을 넣는다. 다른 설정은 기본값 그대로.

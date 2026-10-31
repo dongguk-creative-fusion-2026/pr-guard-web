@@ -6,6 +6,8 @@ import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
 import { SonarStageDetail } from "./SonarDetail";
+import { GuardDogPanel } from "@/components/guarddog/GuardDogPanel";
+import { guarddogNeedsAttention } from "@/lib/guarddog";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
 import { countByPurpose, semgrepInfo } from "@/lib/semgrep";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
@@ -167,6 +169,7 @@ export function StageDetail({
 
       {d && (stage.startsWith("CHECK_") || stage === "LLM") && (
         <>
+          {stage === "CHECK_C" && state.status === "DONE" && <GuardDogPanel report={d.guarddog ?? null} />}
           {d.analyzers && <p className="muted">검사기: {(d.analyzers as string[]).join(", ")}</p>}
           {d.model && (
             <p className="muted">
@@ -190,7 +193,11 @@ export function StageDetail({
             );
           })()}
           {(d.findings ?? []).length === 0 ? (
-            <div className="empty">지적 사항 없음</div>
+            <div className="empty">{stage === "CHECK_C" && state.status !== "DONE"
+              ? state.status === "RUNNING" ? "보안 검사 진행 중입니다." : "보안 검사 결과가 아직 없습니다."
+              : stage === "CHECK_C" && guarddogNeedsAttention(d.guarddog)
+                ? "발견된 지적은 없지만 의존성 검증이 미완료되었습니다."
+                : "지적 사항 없음"}</div>
           ) : (
             <ul className="finding-list">
               {(d.findings as FindingView[]).map((f, i) => {
@@ -388,12 +395,16 @@ export function StageDetail({
       )}
 
       {d && stage === "VERDICT" && (
-        <p>
-          BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor}
-          {d.refuted ? ` (인덱스와 어긋난 지적 ${d.refuted}건 제외)` : ""} → <strong>{state.message}</strong>
-          <br />
-          <span className="muted">판정 규칙: BLOCKER 1건 이상 → 머지 비권장, MAJOR 1건 이상 → 수정 후 머지</span>
-        </p>
+        <div>
+          <p>
+            BLOCKER {d.blocker} · MAJOR {d.major} · MINOR {d.minor}
+            {d.refuted ? ` (인덱스와 어긋난 지적 ${d.refuted}건 제외)` : ""} → <strong>{state.message}</strong>
+            <br />
+            <span className="muted">판정 규칙: BLOCKER → 머지 비권장, MAJOR 기준 충족 또는 의존성 검증 미완료 → 수정 후 머지</span>
+          </p>
+          {d.reason && <p className="notice">{d.reason}</p>}
+          {d.guarddog && <GuardDogPanel report={d.guarddog} />}
+        </div>
       )}
 
       {d && stage === "PUBLISH" && (

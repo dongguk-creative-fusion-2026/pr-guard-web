@@ -18,6 +18,7 @@ import {
   type StageId,
 } from "./stages";
 import { usePipelineEvents } from "./usePipelineEvents";
+import { guarddogNeedsAttention } from "@/lib/guarddog";
 
 /** 실행 검증 레인 뒤에 까는 묶음 상자 (누를 수 없는 배경) */
 function LaneNode({ data }: { data: { width: number; height: number; label: string } }) {
@@ -270,6 +271,9 @@ function Pipeline({ reviewId, projectId }: { reviewId: number; projectId?: numbe
         </AnimatePresence>
       </div>
       <p className="muted pipeline-hint">노드를 누르면 그 단계가 만든 결과를 볼 수 있습니다.</p>
+      {verdict && guarddogNeedsAttention(states.VERDICT.data?.guarddog) && (
+        <p className="notice">의존성 검증 미완료: 실패 원인을 확인하고 다시 리뷰하세요.</p>
+      )}
 
       {focus && <StageDetail stage={focus} state={states[focus]} projectId={projectId} reviewId={reviewId} />}
     </section>

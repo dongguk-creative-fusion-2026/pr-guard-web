@@ -3,6 +3,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
 import { durationMs, STAGE_META, stageMetrics, type StageId, type StageState } from "./stages";
+import { guarddogNeedsAttention } from "@/lib/guarddog";
 
 export type StageNodeData = {
   stage: Exclude<StageId, "REVIEW">;
@@ -27,10 +28,11 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
   const meta = STAGE_META[stage];
   const metrics = stageMetrics(stage, state.data);
   const ms = durationMs(state);
+  const dependencyAttention = state.status === "DONE" && (stage === "CHECK_C" || stage === "VERDICT") && guarddogNeedsAttention(state.data?.guarddog);
 
   return (
     <motion.div
-      className={`stage-node ${state.status}${selected ? " selected" : ""}`}
+      className={`stage-node ${state.status}${selected ? " selected" : ""}${dependencyAttention ? " guarddog-attention" : ""}`}
       initial={false}
       animate={
         state.status === "RUNNING"
@@ -53,7 +55,7 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 15 }}
                 >
-                  {STATUS_ICON[state.status]}
+                  {dependencyAttention ? "!" : STATUS_ICON[state.status]}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -66,6 +68,7 @@ export function StageNode({ data }: NodeProps<StageFlowNode>) {
           {metrics.map((m) => (
             <span key={m}>{m}</span>
           ))}
+          {dependencyAttention && <span>의존성 미완료</span>}
           {ms != null && <span className="ms">{ms}ms</span>}
         </motion.div>
       )}

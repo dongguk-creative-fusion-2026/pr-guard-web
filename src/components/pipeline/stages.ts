@@ -60,7 +60,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   IMPACT: { label: "변경 영향", hint: "GitNexus 호출 그래프 · 여러 단계" },
   HISTORY: { label: "git 이력", hint: "동시 변경 · blame" },
   CHECK_B: { label: "B · 변경 영향", hint: "호출부 · 참조" },
-  CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿 · Semgrep 보안" },
+  CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿 · Semgrep · GuardDog" },
   CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락 · Semgrep 버그 · 규칙 · 마이그레이션" },
   LLM: { label: "LLM 리뷰", hint: "근거 + diff" },
   EXEC_PREPARE: { label: "E · 실행 준비", hint: "러너 이미지 · Job 생성" },
