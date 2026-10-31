@@ -519,6 +519,23 @@ button.small {
   gap: 8px;
 }
 
+.impact-fns {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 12px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.impact-confirmed {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  background: var(--surface);
+}
+
 .cochange-label {
   font-size: 0.85rem;
   margin-bottom: 2px;
