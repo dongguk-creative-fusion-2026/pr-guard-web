@@ -3,8 +3,37 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import type { InvariantCandidate } from "@/lib/api";
 
 export type FormState = { error?: string; message?: string; reviewId?: number };
+
+export async function startInvariantRun(projectId: number, number: number, candidate: InvariantCandidate) {
+  try { return { run: await api.startInvariantRun(projectId, number, candidate) }; }
+  catch (e) { return { error: e instanceof ApiError ? e.message : "테스트를 시작하지 못했습니다." }; }
+}
+
+export async function getInvariantRun(projectId: number, number: number, runId: string) {
+  try { return { run: await api.getInvariantRun(projectId, number, runId) }; }
+  catch (e) { return { error: e instanceof ApiError ? e.message : "실행 결과를 읽지 못했습니다." }; }
+}
+
+export async function compileInvariantRules(projectId: number, number: number, rules: string) {
+  try {
+    return { interpretation: await api.compileInvariantRules(projectId, number, rules) };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "규칙을 해석하지 못했습니다." };
+  }
+}
+
+export async function saveInvariantSettings(projectId: number, number: number, rules: string): Promise<FormState> {
+  try {
+    await api.saveInvariantSettings(projectId, number, rules);
+    revalidatePath(`/projects/${projectId}/prs/${number}`);
+    return { message: "규칙을 저장했습니다." };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "규칙을 저장하지 못했습니다." };
+  }
+}
 
 export async function registerProject(_: FormState, form: FormData): Promise<FormState> {
   const url = String(form.get("url") ?? "").trim();
@@ -86,5 +115,15 @@ export async function createAgentsPull(projectId: number, content: string): Prom
     return { url: r.url };
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "PR 을 만들지 못했습니다" };
+  }
+}
+
+export async function saveProjectInvariantSettings(projectId: number, rules: string): Promise<FormState> {
+  try {
+    await api.saveProjectInvariantSettings(projectId, rules);
+    revalidatePath(`/projects/${projectId}/invariants`);
+    return { message: "프로젝트 규칙을 저장했습니다." };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "프로젝트 규칙을 저장하지 못했습니다." };
   }
 }

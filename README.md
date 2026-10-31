@@ -4,6 +4,47 @@ PR Guard 프론트엔드 (Next.js App Router). AI 가 만든 많은 PR 을 사�
 
 - 백엔드: [pr-guard-api](https://github.com/dongguk-creative-fusion-2026/pr-guard-api)
 
+## 데이터 정합성 규칙과 Hypothesis 실행
+
+### 화면에서 사용하기
+
+1. 프로젝트를 연 뒤 상단 **정합성 규칙**에서 공통으로 사용할 규칙을 저장한다. 이 단계는 선택 사항이다.
+2. **PR 이력**에서 검사할 PR을 열고 **데이터 정합성 규칙** 입력란에 규칙을 작성한다. 공통 규칙이 있다면 **프로젝트 규칙 불러오기**로 복사해 수정할 수 있다.
+3. **규칙 저장**을 누른 뒤 **규칙 후보 생성**을 누른다. 예: `게시글 수정 전후 작성자 ID는 같아야 한다`.
+4. 해석된 관계와 적용 조건을 확인한다. 지원하는 후보의 **위 조건으로 Hypothesis 테스트 실행**을 누른다.
+5. 화면에서 대기·실행 상태와 GitHub Actions 링크를 확인한다. 완료되면 반례와 base/head 비교 결과를 볼 수 있다. 조회에 실패하면 **결과 조회 재시도**를 누른다.
+
+프로젝트 기본 규칙은 기존 PR 초안을 자동으로 덮어쓰지 않는다. 후보 생성은 입력란의 현재 내용을 해석하며, 별도로 저장 버튼을 눌러야 PR 초안이 저장된다.
+
+### 실행 결과 읽기
+
+| 결과 | 의미 |
+|---|---|
+| 신규 위반 | 같은 반례로 base는 통과하고 head는 위반 |
+| 기존 위반 | base와 head 모두 위반 |
+| 재현 결과 불일치 | 같은 입력의 결과가 달라 확정할 수 없음 |
+| 반례 미발견 | head에서 정해진 입력 예산 안에 반례가 없었음. base 재생은 생략 |
+| 실행 실패 | 빌드·환경·워크플로 오류 등으로 검증하지 못함 |
+
+실행은 GitHub Actions에서 수행하며 브라우저나 Next.js 서버가 PR 코드를 실행하지 않는다. 사용자 PC에 Docker·Kubernetes·Python을 설치할 필요가 없다. API가 반환하는 `QUEUED`, `RUNNING`, `DONE`, `FAILED` 상태를 조회하고 Actions 링크와 반례를 표시한다. 조회 실패는 별도로 표시하며 재시도할 수 있다.
+
+현재 실제 실행은 `pr-guard-sandbox`의 게시글 작성자 ID 보존 규칙만 지원한다. LLM이 해석한 다른 규칙은 검토 후보이며 실행 버튼을 제공하지 않는다. 지원 규칙도 Spring 서비스와 H2 테스트 DB에서 검증하므로 전체 업무 규칙·실제 PostgreSQL·HTTP 인증의 안전성 보장은 아니다. 반례 미발견도 검증 예산 안에서 발견하지 못했다는 의미다. 결과는 머지 판정에 반영하지 않는다. OpenAI 키가 없는 백엔드는 제한된 기본 템플릿으로만 해석하며 화면에 이를 표시한다.
+
+| 코드 | 역할 |
+|---|---|
+| `src/lib/invariants.ts` | 공유 타입, 활성 실행 판단, 결과 메시지 |
+| `src/components/invariants/useInvariantRun.ts` | 실행 요청과 중복 없는 폴링, 오류·재시도·언마운트 정리 |
+| `src/components/invariants/InvariantRunResult.tsx` | 상태·커밋·Actions 링크·반례 표시 |
+| `src/app/projects/[id]/prs/[number]/InvariantSettings.tsx` | PR 규칙 편집과 후보 확인 |
+| `src/app/projects/[id]/invariants/` | 프로젝트 기본 규칙 편집 |
+| `src/app/actions.ts` / `src/lib/api.ts` | 서버 전용 API 호출과 저장 후 갱신 |
+
+### 배포 순서와 확인
+
+백엔드의 워크플로·DB 마이그레이션·Actions 토큰 권한을 먼저 준비하고 `INVARIANT_EXEC_ENABLED=true`로 활성화한 뒤 웹을 배포한다. Next.js의 `API_BASE_URL`과 필요시 `API_TOKEN`을 백엔드와 맞춘다. OpenAI 키와 Actions 실행용 GitHub 토큰은 백엔드에만 설정한다. [백엔드 상세 설정](https://github.com/dongguk-creative-fusion-2026/pr-guard-api/blob/main/invariant-poc/README.md)
+
+웹 프로덕션 빌드와 타입 검사를 확인했다. 실제 배포 환경에서 버튼부터 Actions 완료까지의 브라우저 종단 간 확인은 별도로 필요하다. 기존 백엔드에 PR 설정 API가 없으면 PR 입력 영역은 표시하지 않으며, 프로젝트 기본 규칙 화면은 해당 API를 제공하는 백엔드가 필요하다.
+
 ## 화면
 
 | 화면 | 주소 | 내용 |

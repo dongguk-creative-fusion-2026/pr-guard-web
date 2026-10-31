@@ -1,4 +1,6 @@
 import "server-only";
+import type { InvariantCandidate, InvariantInterpretation, InvariantRun } from "./invariants";
+export type { InvariantCandidate, InvariantRun } from "./invariants";
 import type { GuardDogReport } from "./guarddog";
 
 // 백엔드(pr-guard-api) 주소. 브라우저가 아니라 Next 서버에서만 호출하므로 CORS 설정이 필요 없다.
@@ -521,12 +523,29 @@ export type RuleMapView = {
 };
 
 export const api = {
+  startInvariantRun: (id: number, number: number, candidate: InvariantCandidate) =>
+    call<InvariantRun>(`/api/projects/${id}/pulls/${number}/invariant-runs`, { method: "POST", body: JSON.stringify(candidate) }),
+  getInvariantRun: (id: number, number: number, runId: string) =>
+    call<InvariantRun>(`/api/projects/${id}/pulls/${number}/invariant-runs/${runId}`),
+  compileInvariantRules: (id: number, number: number, rules: string) =>
+    call<InvariantInterpretation>(`/api/projects/${id}/pulls/${number}/invariant-settings/compile`, {
+      method: "POST", body: JSON.stringify({ rules }),
+    }),
   listProjects: () => call<Project[]>("/api/projects"),
   getProject: (id: number) => call<Project>(`/api/projects/${id}`),
   registerProject: (url: string) =>
     call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ url }) }),
   deleteProject: (id: number) => call<void>(`/api/projects/${id}`, { method: "DELETE" }),
   listPulls: (id: number) => call<PullRequest[]>(`/api/projects/${id}/pulls`),
+  getProjectInvariantSettings: (id: number) => call<{ rules: string }>(`/api/projects/${id}/invariant-settings`),
+  saveProjectInvariantSettings: (id: number, rules: string) =>
+    call<{ rules: string }>(`/api/projects/${id}/invariant-settings`, { method: "PUT", body: JSON.stringify({ rules }) }),
+  getInvariantSettings: (id: number, number: number) =>
+    call<{ rules: string }>(`/api/projects/${id}/pulls/${number}/invariant-settings`),
+  saveInvariantSettings: (id: number, number: number, rules: string) =>
+    call<{ rules: string }>(`/api/projects/${id}/pulls/${number}/invariant-settings`, {
+      method: "PUT", body: JSON.stringify({ rules }),
+    }),
   listReviews: (id: number, limit = 20) => call<Review[]>(`/api/projects/${id}/reviews?limit=${limit}`),
   pollNow: (id: number) => call<PollResult>(`/api/projects/${id}/poll`, { method: "POST" }),
   getReview: (reviewId: number) => call<ReviewDetail>(`/api/reviews/${reviewId}`),
