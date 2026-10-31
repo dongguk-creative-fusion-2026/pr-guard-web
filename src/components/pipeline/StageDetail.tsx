@@ -21,6 +21,28 @@ type GroundView = {
 
 type FindingView = { severity: string; ruleId: string; title: string; file: string | null; line: number | null };
 
+type ConflictMethodView = {
+  id: string;
+  file: string;
+  snippets: { ref: string; role: string; side: string; symbol: string; file: string; line: number; endLine: number }[];
+};
+
+/** 기존 코드 조각 종류 (백엔드 ContractContext.Role) */
+const SNIPPET_ROLE: Record<string, string> = {
+  BASE_BODY: "PR 전 본문",
+  DROPPED_CALLEE: "안 부르게 된 메서드",
+  NEW_CALLEE: "새로 부르는 메서드",
+  LOST_EXCEPTION: "이제 안 던지는 예외",
+  CALLER: "부르는 곳",
+  TEST: "테스트",
+};
+
+function shortId(id: string): string {
+  const hash = id.indexOf("#");
+  const type = hash < 0 ? id : id.slice(0, hash);
+  return type.slice(type.lastIndexOf(".") + 1) + (hash < 0 ? "" : id.slice(hash));
+}
+
 function fileName(path: string | null | undefined): string {
   return path ? path.slice(path.lastIndexOf("/") + 1) : "-";
 }
@@ -154,7 +176,31 @@ export function StageDetail({
         </>
       )}
 
-      {d && (stage.startsWith("CHECK_") || stage === "LLM") && (
+      {d && stage === "LLM_CONFLICT" && (d.methods ?? []).length > 0 && (
+        <>
+          <h3>바뀐 메서드가 기대던 기존 코드</h3>
+          {(d.methods as ConflictMethodView[]).map((m) => (
+            <div key={m.id}>
+              <p>
+                <code>{shortId(m.id)}</code>
+              </p>
+              <ul>
+                {m.snippets.map((s) => (
+                  <li key={s.ref}>
+                    <span className="muted">[{s.ref}]</span> {SNIPPET_ROLE[s.role] ?? s.role} <code>{shortId(s.symbol)}</code>{" "}
+                    <span className="muted">
+                      ({s.side} · {fileName(s.file)}:{s.line}
+                      {s.endLine > s.line && `-${s.endLine}`})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
+
+      {d && (stage.startsWith("CHECK_") || stage === "LLM" || stage === "LLM_CONFLICT") && (
         <>
           {d.analyzers && <p className="muted">검사기: {(d.analyzers as string[]).join(", ")}</p>}
           {d.model && (

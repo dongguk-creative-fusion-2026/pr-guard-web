@@ -12,6 +12,7 @@ export type StageId =
   | "CHECK_C"
   | "CHECK_D"
   | "LLM"
+  | "LLM_CONFLICT"
   | "EXEC_PREPARE"
   | "EXEC_POD_BASE"
   | "EXEC_POD_HEAD"
@@ -62,6 +63,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   CHECK_C: { label: "C · 보안", hint: "권한 · 시크릿" },
   CHECK_D: { label: "D · 위험도", hint: "동시 변경 누락" },
   LLM: { label: "LLM 리뷰", hint: "근거 + diff" },
+  LLM_CONFLICT: { label: "기존 코드 충돌", hint: "기대던 기존 코드 ↔ 변경" },
   EXEC_PREPARE: { label: "E · 실행 준비", hint: "러너 이미지 · Job 생성" },
   EXEC_POD_BASE: { label: "base Pod 기동", hint: "스케줄 · 이미지 · 기동" },
   EXEC_POD_HEAD: { label: "head Pod 기동", hint: "스케줄 · 이미지 · 기동" },
@@ -94,6 +96,7 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   CHECK_C: { x: 5 * COL, y: 2 * ROW },
   CHECK_D: { x: 5 * COL, y: 3 * ROW },
   LLM: { x: 5 * COL, y: 4 * ROW },
+  LLM_CONFLICT: { x: 5 * COL, y: 4.95 * ROW },
   // 실행 검증 레인: 소스 준비 뒤에서 아래로 갈라져 나란히 돌고 판정에 합류한다
   EXEC_PREPARE: { x: 2 * COL, y: 5.9 * ROW },
   EXEC_POD_BASE: { x: 3 * COL, y: 5.3 * ROW },
@@ -129,6 +132,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   CHECK_C: { x: VCOL, y: 5 * VROW },
   CHECK_D: { x: -VCOL / 2, y: 6 * VROW },
   LLM: { x: VCOL / 2, y: 6 * VROW },
+  LLM_CONFLICT: { x: 1.5 * VCOL, y: 6 * VROW },
   // 실행 검증 레인은 오른쪽 열에
   EXEC_PREPARE: { x: 2.1 * VCOL, y: 2 * VROW },
   EXEC_POD_BASE: { x: 1.6 * VCOL, y: 3 * VROW },
@@ -156,11 +160,13 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["HISTORY", "CHECK_C"],
   ["HISTORY", "CHECK_D"],
   ["HISTORY", "LLM"],
+  ["HISTORY", "LLM_CONFLICT"],
   ["CHECK_A", "GROUND"],
   ["CHECK_B", "GROUND"],
   ["CHECK_C", "GROUND"],
   ["CHECK_D", "GROUND"],
   ["LLM", "GROUND"],
+  ["LLM_CONFLICT", "GROUND"],
   ["GROUND", "VERDICT"],
   ["CHECKOUT", "EXEC_PREPARE"],
   ["EXEC_PREPARE", "EXEC_POD_BASE"],
@@ -235,6 +241,10 @@ export function stageMetrics(stage: StageId, data: StageData | null): string[] {
     case "CHECK_D":
     case "LLM":
       return [`지적 ${data.findings?.length ?? 0}`];
+    case "LLM_CONFLICT": {
+      const snippets = (data.methods ?? []).reduce((n: number, m: { snippets?: unknown[] }) => n + (m.snippets?.length ?? 0), 0);
+      return [`충돌 ${data.findings?.length ?? 0}`, `기존 코드 ${snippets}조각`];
+    }
     case "EXEC_PREPARE":
       return [data.runner === "KUBERNETES" ? "K8s Job 2" : "컨테이너 2"];
     case "EXEC_POD_BASE":
