@@ -474,6 +474,8 @@ export type MapRule = {
   support: number;
   total: number;
   members: string[];
+  /** 관례: 같은 종류인데 지키지 않는 곳 (예전 지도에는 없다) */
+  outliers?: string[];
 };
 
 /** 기본 브랜치 끝 커밋의 규칙 지도와, 지난 지도 대비 바뀐 규칙 */
