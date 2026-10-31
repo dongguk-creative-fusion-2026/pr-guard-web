@@ -5,6 +5,7 @@ import { BehaviorDiffTable } from "./BehaviorDiff";
 import { EvidenceVerdicts, GeneratedTests } from "./Evidence";
 import { AstDiffView } from "./AstDiffView";
 import { ImpactGraph } from "./ImpactGraph";
+import { SonarStageDetail } from "./SonarDetail";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import Link from "next/link";
@@ -251,6 +252,8 @@ export function StageDetail({
           )}
         </>
       )}
+
+      {d && stage === "EXEC_SONAR" && <SonarStageDetail data={d} />}
 
       {d && stage === "EXEC_EVIDENCE" && <GeneratedTests data={d} />}
 

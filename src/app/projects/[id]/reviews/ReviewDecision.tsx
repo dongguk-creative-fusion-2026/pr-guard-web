@@ -10,6 +10,8 @@ import { pickSelection, seconds } from "@/lib/testSelection";
 import type { TestSelection } from "@/lib/api";
 import { BehaviorDiffTable, type BehaviorRow } from "@/components/pipeline/BehaviorDiff";
 import { PipelineView } from "@/components/pipeline/PipelineView";
+import { SonarBadge, SonarCard } from "@/components/pipeline/SonarDetail";
+import { isSonar, sonarEvidence, sonarLink, sonarStage } from "@/lib/sonar";
 import { RerunButton } from "../RerunButton";
 import { ReviewMarkdown } from "../ReviewMarkdown";
 import { ImpactCityInlineClient } from "./ImpactCityInlineClient";
@@ -164,6 +166,7 @@ export async function ReviewDecision({ projectId, reviewId }: { projectId: numbe
                 </div>
               )}
               <TestSelectionCard selection={pickSelection([], events)} href={`${base}/tests`} />
+              <SonarCard stage={sonarStage(events)} />
               {graph?.graph && context && (
                 <ZoneCard
                   zones={touchedZones(computeDelegation(graph.graph), (context.files ?? context.history).map((f) => ("path" in f ? f.path : f.file)))}
@@ -238,7 +241,9 @@ function FindingList({
               <details>
                 <summary>
                   <span className={`tag ${f.severity}`}>{f.severity}</span>
-                  <span className="fl-title">{f.title}</span>
+                  <span className="fl-title">
+                    {f.title} {isSonar(f) && <SonarBadge />}
+                  </span>
                   <span className="fl-sub">
                     <span className="mono">
                       {fileName(f.file)}
@@ -249,7 +254,18 @@ function FindingList({
                 </summary>
                 <div className="fl-body">
                   <p>{f.message}</p>
-                  {f.evidence && <pre className="fl-evidence">{f.evidence}</pre>}
+                  {isSonar(f) ? (
+                    <>
+                      {sonarEvidence(f) && <pre className="fl-evidence">{sonarEvidence(f)}</pre>}
+                      {sonarLink(f) && (
+                        <a href={sonarLink(f)!} target="_blank" rel="noreferrer" className="fl-link">
+                          SonarCloud 에서 이 이슈 보기
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    f.evidence && <pre className="fl-evidence">{f.evidence}</pre>
+                  )}
                   <dl className="fl-layers">
                     {[...LAYER_ORDER].reverse().map((id) => {
                       const l = layerOf(g, id);
@@ -336,7 +352,7 @@ function FindingTable({ findings }: { findings: Finding[] }) {
               </td>
               <td>
                 {CATEGORY_LABEL[f.category]}
-                <div className="muted">{f.source === "LLM" ? "AI" : f.ruleId}</div>
+                <div className="muted">{f.source === "LLM" ? "AI" : isSonar(f) ? <SonarBadge /> : f.ruleId}</div>
               </td>
               <td>
                 <LayerChips finding={f} />
