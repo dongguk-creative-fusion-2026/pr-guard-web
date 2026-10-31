@@ -6,6 +6,7 @@ export type StageId =
   | "INDEX_BASE"
   | "INDEX_HEAD"
   | "METHOD_DIFF"
+  | "IMPACT"
   | "HISTORY"
   | "CHECK_A"
   | "CHECK_B"
@@ -56,6 +57,7 @@ export const STAGE_META: Record<Exclude<StageId, "REVIEW">, { label: string; hin
   INDEX_BASE: { label: "base 인덱스", hint: "타입 · 메서드 · 호출" },
   INDEX_HEAD: { label: "head 인덱스", hint: "타입 · 메서드 · 호출" },
   METHOD_DIFF: { label: "메서드 비교", hint: "바뀐 메서드 · 호출부" },
+  IMPACT: { label: "변경 영향", hint: "GitNexus 호출 그래프 · 여러 단계" },
   HISTORY: { label: "git 이력", hint: "동시 변경 · blame" },
   CHECK_A: { label: "A · 의도 대비", hint: "PR 설명 ↔ 변경" },
   CHECK_B: { label: "B · 변경 영향", hint: "호출부 · 참조" },
@@ -88,6 +90,8 @@ export const POSITIONS: Record<Exclude<StageId, "REVIEW">, { x: number; y: numbe
   INDEX_BASE: { x: 2 * COL, y: 1.4 * ROW },
   INDEX_HEAD: { x: 2 * COL, y: 2.6 * ROW },
   METHOD_DIFF: { x: 3 * COL, y: 2 * ROW },
+  // 변경 영향: 미리 만든 GitNexus 그래프로 바뀐 함수를 부르는 쪽을 따라가 검사 · LLM 에 넘긴다
+  IMPACT: { x: 4 * COL, y: 0.8 * ROW },
   HISTORY: { x: 4 * COL, y: 2 * ROW },
   CHECK_A: { x: 5 * COL, y: 0 },
   CHECK_B: { x: 5 * COL, y: ROW },
@@ -123,6 +127,7 @@ export const POSITIONS_VERTICAL: Record<Exclude<StageId, "REVIEW">, { x: number;
   INDEX_BASE: { x: -VCOL / 2, y: 2 * VROW },
   INDEX_HEAD: { x: VCOL / 2, y: 2 * VROW },
   METHOD_DIFF: { x: 0, y: 3 * VROW },
+  IMPACT: { x: -VCOL, y: 4.5 * VROW },
   HISTORY: { x: 0, y: 4 * VROW },
   CHECK_A: { x: -VCOL, y: 5 * VROW },
   CHECK_B: { x: 0, y: 5 * VROW },
@@ -151,6 +156,9 @@ export const EDGES: [Exclude<StageId, "REVIEW">, Exclude<StageId, "REVIEW">][] =
   ["INDEX_BASE", "METHOD_DIFF"],
   ["INDEX_HEAD", "METHOD_DIFF"],
   ["METHOD_DIFF", "HISTORY"],
+  ["METHOD_DIFF", "IMPACT"],
+  ["IMPACT", "CHECK_B"],
+  ["IMPACT", "LLM"],
   ["HISTORY", "CHECK_A"],
   ["HISTORY", "CHECK_B"],
   ["HISTORY", "CHECK_C"],
