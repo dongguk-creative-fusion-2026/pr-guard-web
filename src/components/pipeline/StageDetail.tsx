@@ -8,7 +8,7 @@ import { ImpactGraph } from "./ImpactGraph";
 import { LAYER_META, LAYER_ORDER, MARK_META, STATUS_META } from "@/lib/grounding";
 import type { GroundLayerId, GroundMark, GroundStatus } from "@/lib/api";
 import Link from "next/link";
-import { durationMs, STAGE_META, type StageId, type StageState } from "./stages";
+import { durationMs, STAGE_META, type StageData, type StageId, type StageState } from "./stages";
 
 type GroundView = {
   severity: string;
@@ -107,6 +107,8 @@ export function StageDetail({
           {d.ast && <AstDiffView methods={d.ast} />}
         </>
       )}
+
+      {d && stage === "IMPACT" && <GraphImpactDetail d={d} />}
 
       {d && stage === "HISTORY" && (
         <>
@@ -361,5 +363,69 @@ export function StageDetail({
         </p>
       )}
     </motion.div>
+  );
+}
+
+type ImpactFn = { file: string; name: string; line: number; depth: number; via: string | null; confirmed: boolean };
+
+/** GitNexus 호출 그래프로 따라간 변경 영향: 바뀐 함수 → 부르는 함수를 단계별로 */
+function GraphImpactDetail({ d }: { d: StageData }) {
+  const changed = (d.changed ?? []) as ImpactFn[];
+  const impacted = (d.impacted ?? []) as ImpactFn[];
+  const depths = [...new Set(impacted.map((f) => f.depth))].sort((a, b) => a - b);
+  return (
+    <>
+      <p className="muted">
+        기본 브랜치 <code>{String(d.commitSha ?? "").slice(0, 7)}</code> 의 GitNexus 호출 그래프에서 바뀐 함수를 부르는
+        함수를 따라갔습니다. 언어를 가리지 않고, &quot;인덱스로도 확인&quot;은 Java 인덱스가 같은 호출을 찾은 것입니다.
+        {d.baseMatches === false && " 그래프 커밋이 이 PR 의 base 와 달라 줄 위치가 조금 어긋날 수 있습니다."}
+        {d.complete === false && " 그래프가 레포 일부만 담고 있어 빠진 호출이 있을 수 있습니다."}
+      </p>
+      <div className="stats">
+        {[
+          ["바뀐 함수", changed.length],
+          ["영향 함수", impacted.length],
+          ["고치지 않은 파일", (d.impactedFiles ?? []).length],
+          ["인덱스로도 확인", d.confirmed ?? 0],
+        ].map(([k, v]) => (
+          <div key={k} className="stat">
+            <div className="stat-value">{v}</div>
+            <div className="muted">{k}</div>
+          </div>
+        ))}
+      </div>
+      {changed.length > 0 && (
+        <>
+          <h4>바뀐 함수</h4>
+          <ul className="impact-fns">
+            {changed.map((f) => (
+              <li key={`${f.file}#${f.name}:${f.line}`}>
+                <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {depths.map((depth) => (
+        <div key={depth}>
+          <h4>{depth}단계 — 부르는 함수</h4>
+          <ul className="impact-fns">
+            {impacted
+              .filter((f) => f.depth === depth)
+              .map((f) => (
+                <li key={`${f.file}#${f.name}:${f.line}`}>
+                  <code>{f.name}</code> <span className="muted">{fileName(f.file)}:{f.line}</span>
+                  {f.via && <span className="muted"> → {f.via.split("#").pop()}</span>}
+                  {f.confirmed && <span className="impact-confirmed">인덱스로도 확인</span>}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
+      {impacted.length === 0 && <div className="empty">이 변경을 부르는 함수가 그래프에 없음</div>}
+      {(d.unmapped ?? []).length > 0 && (
+        <p className="muted">그래프에 없는 바뀐 파일(새 파일 · 함수 밖 변경): {(d.unmapped as string[]).map(fileName).join(", ")}</p>
+      )}
+    </>
   );
 }
